@@ -1,0 +1,7 @@
+<Image
+  src={product.imageUrl || "/images/placeholder.png"}
+  alt={product.name || "product image"}
+  fill
+  sizes="(max-width:768px) 50vw, 20vw"
+  className="object-cover transition-transform duration-700 group-hover:scale-105"
+/>

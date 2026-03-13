@@ -1,0 +1,59 @@
+"use client";
+import { useEffect } from "react";
+import Script from "next/script";
+
+export default function VoiceAssistant() {
+
+  return (
+    <>
+      {/* Load Voice JS */}
+      <Script src="/voice.js" strategy="afterInteractive" />
+
+      {/* Voice Button (THIS will replace your mic beside search) */}
+      <button
+        id="azzro-voice-btn"
+        className="azzro-voice-button"
+        aria-label="Voice Assistant"
+      >
+        🎤
+      </button>
+
+      {/* Overlay */}
+      <div id="azzro-voice-overlay" className="azzro-voice-overlay">
+        <div className="azzro-voice-modal">
+
+          <div className="azzro-voice-header">
+            <h2 className="azzro-voice-title">🎙️ Azzro Voice Assistant</h2>
+            <button id="azzro-close-btn" className="azzro-voice-close">
+              &times;
+            </button>
+          </div>
+
+          <div style={{ textAlign: "center" }}>
+            <span className="voice-quality-badge">
+              ✨ Natural Female Voice
+            </span>
+            <div id="voice-info" className="voice-info"></div>
+          </div>
+
+          <div id="azzro-mic-visual" className="azzro-mic-visual"></div>
+
+          <div id="speaking-indicator" className="speaking-indicator"></div>
+
+          <div id="azzro-status" className="azzro-status-message">
+            Hi! I'm your shopping assistant. How can I help you today?
+          </div>
+
+          <div id="azzro-conversation" className="azzro-conversation"></div>
+
+          <div id="azzro-transcript" className="azzro-transcript">
+            Your command will appear here...
+          </div>
+
+          <div id="azzro-response" className="azzro-response"></div>
+
+        </div>
+      </div>
+    </>
+  );
+}

@@ -1,0 +1,1 @@
+import { connectDB } from ./lib/db; import Product from ./lib/Product; async function run() { await connectDB(); console.log(await Product.find()); process.exit(0); } run();
