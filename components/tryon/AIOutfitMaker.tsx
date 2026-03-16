@@ -58,15 +58,15 @@ export default function AIOutfitMaker({ onClose }: { onClose?: () => void }) {
     setLoading(true); setOutfits([]);
     try {
       /* Step 1 — Claude generates outfit details */
-      const res = await fetch("https://api.anthropic.com/v1/messages",{
+      const res = await fetch("/api/ai",{
         method:"POST", headers:{"Content-Type":"application/json"},
         body:JSON.stringify({
-          model:"claude-sonnet-4-20250514", max_tokens:1000,
+          max_tokens:1000,
           messages:[{role:"user",content:`You are ${stylist.name} (${stylist.style}). Generate 3 outfit suggestions. Occasion: ${occasion}. Vibe: ${styleVibe||"any"}. Notes: ${prompt||"none"}. Respond ONLY valid JSON no markdown: {"outfits":[{"name":"Name","items":["item1","item2","item3"],"vibe":"tag","color":"#hexcolor","emoji":"👗","tip":"short tip"}]}`}],
         }),
       });
       const data = await res.json();
-      const txt  = data.content?.map((c:any)=>c.text||"").join("")||"";
+      const txt  = data.text||"";
       const parsed: OutfitItem[] = JSON.parse(txt.replace(/```json|```/g,"").trim()).outfits||[];
 
       setOutfits(parsed);
