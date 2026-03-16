@@ -155,15 +155,14 @@ export default function AITryOn({ onClose }: { onClose?: () => void }) {
     setStep("result");
 
     try {
-      /* Call our Next.js API route - handles fal.ai + fit analysis server-side */
+      /* Call our Next.js API route which handles fal.ai */
       const res = await fetch("/api/tryon", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          human_image:  st.personImage,
-          cloth_image:  st.garmentImage,
-          cloth_type:   st.clothType,
-          garment_name: st.garmentName || "Garment",
+          human_image: st.personImage,
+          cloth_image: st.garmentImage,
+          cloth_type:  st.clothType,
         }),
       });
 
@@ -175,17 +174,17 @@ export default function AITryOn({ onClose }: { onClose?: () => void }) {
         throw new Error(errMsg);
       }
 
-      /* result_url comes directly from server - no client-side parsing needed */
+      /* Extract result URL */
       const resultUrl = data.result_url || extractUrl(data.image);
       if (!resultUrl) {
         const raw = JSON.stringify(data);
-        setDebugInfo(`No URL found: ${raw.slice(0, 200)}`);
+        setDebugInfo("No URL found: " + raw.slice(0, 200));
         throw new Error("Try-on completed but no output image URL found.");
       }
 
-      /* fit score & tip come from server-side Claude call - always safe */
+      /* Fit score comes from /api/tryon response (server-side, safe) */
       const fitScore = typeof data.fit_score === "number" ? data.fit_score : 85;
-      const fitNotes = typeof data.fit_tip   === "string" ? data.fit_tip   : "Great choice! This garment suits your style perfectly.";
+      const fitNotes = typeof data.fit_tip === "string" ? data.fit_tip : "Looks great on you!";
 
       up({ loading: false, result: resultUrl, fitScore, fitNotes });
 
