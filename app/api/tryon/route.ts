@@ -1,121 +1,93 @@
-import { NextRequest, NextResponse } from "next/server";
-export const maxDuration = 60;
+/**
+ * app/api/tryon/route.ts
+ * AZZRO Virtual Try-On — fal.ai FASHN v1.6
+ */
 
-async function uploadToFal(base64DataUrl: string, falKey: string): Promise<string> {
-  const match = base64DataUrl.match(/^data:(.+?);base64,(.+)$/);
-  if (!match) throw new Error("Invalid image format — not a base64 data URL");
-  const mimeType = match[1];
-  const b64data  = match[2];
-  const res = await fetch("https://rest.alpha.fal.ai/storage/upload/base64", {
-    method:  "POST",
-    headers: { "Authorization": "Key " + falKey, "Content-Type": "application/json" },
-    body:    JSON.stringify({ content_type: mimeType, data: b64data }),
+import { NextRequest, NextResponse } from "next/server";
+import { runTryOn, uploadImageToFal, FashnCategory } from "@/lib/falTryOn";
+
+export const runtime = "nodejs";
+
+async function fetchImageAsBlob(url: string): Promise<Blob> {
+  const res = await fetch(url, {
+    headers: {
+      "User-Agent": "Mozilla/5.0 (compatible; AZZRO/1.0)",
+      "Accept": "image/*,*/*",
+    },
   });
-  if (!res.ok) throw new Error("FAL upload failed: " + res.status);
-  return (await res.json()).url;
+  if (!res.ok) throw new Error(`Failed to fetch image from ${url}: ${res.status}`);
+  return res.blob();
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const raw = await req.text();
+    const contentType = req.headers.get("content-type") ?? "";
 
-    if (!raw || raw.trim() === "") {
-      return NextResponse.json({ error: "Empty request body" }, { status: 400 });
+    let humanImageUrl: string;
+    let garmentImageUrl: string;
+    let category: FashnCategory = "auto";
+    let longGarment = false;
+
+    if (contentType.includes("multipart/form-data")) {
+      const formData = await req.formData();
+      category = ((formData.get("category") as string) ?? "auto") as FashnCategory;
+      longGarment = formData.get("longGarment") === "true";
+
+      // ── Human image ──
+      const humanFile = formData.get("humanImage") as File | null;
+      const humanUrl  = formData.get("humanImageUrl") as string | null;
+
+      if (humanFile && humanFile.size > 0) {
+        console.log("[tryon] Uploading human image...");
+        humanImageUrl = await uploadImageToFal(humanFile);
+      } else if (humanUrl) {
+        humanImageUrl = humanUrl;
+      } else {
+        return NextResponse.json({ error: "humanImage or humanImageUrl required" }, { status: 400 });
+      }
+
+      // ── Garment image ──
+      const garmentFile = formData.get("garmentImage") as File | null;
+      const garmentUrl  = formData.get("garmentImageUrl") as string | null;
+
+      if (garmentFile && garmentFile.size > 0) {
+        console.log("[tryon] Uploading garment image...");
+        garmentImageUrl = await uploadImageToFal(garmentFile);
+      } else if (garmentUrl) {
+        console.log("[tryon] Fetching garment from URL:", garmentUrl);
+        const blob = await fetchImageAsBlob(garmentUrl);
+        garmentImageUrl = await uploadImageToFal(blob);
+      } else {
+        return NextResponse.json({ error: "garmentImage or garmentImageUrl required" }, { status: 400 });
+      }
+
+    } else {
+      const body = await req.json();
+      category = (body.category ?? "auto") as FashnCategory;
+      longGarment = body.longGarment ?? false;
+      humanImageUrl  = body.humanImageUrl;
+      garmentImageUrl = body.garmentImageUrl;
+
+      if (!humanImageUrl || !garmentImageUrl) {
+        return NextResponse.json({ error: "humanImageUrl and garmentImageUrl required" }, { status: 400 });
+      }
     }
 
-    let body: any;
-    try {
-      body = JSON.parse(raw);
-    } catch (e: any) {
-      return NextResponse.json({
-        error: "JSON parse failed: " + e.message,
-        first100: raw.slice(0, 100),
-      }, { status: 400 });
-    }
+    console.log("[tryon] FASHN v1.6 | category:", category, "| longGarment:", longGarment);
 
-    const human_image = body.human_image;
-    const cloth_image = body.cloth_image;
-    const cloth_type  = body.cloth_type || "upper_body";
+    const result = await runTryOn({ humanImageUrl, garmentImageUrl, category, longGarment });
 
-    if (!human_image || typeof human_image !== "string") {
-      return NextResponse.json({ error: "human_image missing or invalid" }, { status: 400 });
-    }
-    if (!cloth_image || typeof cloth_image !== "string") {
-      return NextResponse.json({ error: "cloth_image missing or invalid" }, { status: 400 });
-    }
-    if (!human_image.startsWith("data:image/")) {
-      return NextResponse.json({
-        error: "human_image is not a valid base64 image",
-        starts: human_image.slice(0, 80),
-      }, { status: 400 });
-    }
-    if (!cloth_image.startsWith("data:image/")) {
-      return NextResponse.json({
-        error: "cloth_image is not a valid base64 image",
-        starts: cloth_image.slice(0, 80),
-      }, { status: 400 });
-    }
-
-    const FAL_KEY = process.env.FAL_KEY;
-    if (!FAL_KEY) return NextResponse.json({ error: "FAL_KEY not set" }, { status: 500 });
-
-    let humanUrl: string;
-    let clothUrl: string;
-    try {
-      const uploaded = await Promise.all([
-        uploadToFal(human_image, FAL_KEY),
-        uploadToFal(cloth_image, FAL_KEY),
-      ]);
-      humanUrl = uploaded[0];
-      clothUrl = uploaded[1];
-    } catch (e: any) {
-      return NextResponse.json({ error: "FAL upload: " + e.message }, { status: 502 });
-    }
-
-    const sub = await fetch("https://queue.fal.run/fal-ai/cat-vton", {
-      method:  "POST",
-      headers: { "Authorization": "Key " + FAL_KEY, "Content-Type": "application/json" },
-      body:    JSON.stringify({ human_image_url: humanUrl, cloth_image_url: clothUrl, cloth_type }),
+    return NextResponse.json({
+      success: true,
+      imageUrl: result.imageUrl,
+      requestId: result.requestId,
+      width: result.width,
+      height: result.height,
     });
-    if (!sub.ok) {
-      return NextResponse.json({
-        error: "FAL submit failed: " + sub.status,
-        body:  await sub.text(),
-      }, { status: 502 });
-    }
 
-    const { request_id } = await sub.json();
-    if (!request_id) return NextResponse.json({ error: "No request_id from FAL" }, { status: 502 });
-
-    const end = Date.now() + 55000;
-    while (Date.now() < end) {
-      await new Promise(r => setTimeout(r, 3000));
-      const p = await fetch(`https://queue.fal.run/fal-ai/cat-vton/requests/${request_id}`, {
-        headers: { "Authorization": "Key " + FAL_KEY },
-      });
-      if (!p.ok) continue;
-      const d = await p.json();
-      if (d.status === "COMPLETED") {
-        const img = d.output?.image || d.output?.images?.[0] || d.images?.[0] || d.image;
-        if (!img) return NextResponse.json({ error: "No image in FAL response" }, { status: 502 });
-        const url = typeof img === "string" ? img : img.url || img.cdn_url || "";
-        return NextResponse.json({
-          success:    true,
-          result_url: url,
-          image:      img,
-          fit_score:  85,
-          fit_tip:    "Looks great on you!",
-        });
-      }
-      if (d.status === "FAILED") {
-        return NextResponse.json({ error: "FAL failed: " + (d.error || "unknown") }, { status: 502 });
-      }
-    }
-
-    return NextResponse.json({ error: "Timeout waiting for result" }, { status: 504 });
-
-  } catch (e: any) {
-    console.error("[/api/tryon]", e);
-    return NextResponse.json({ error: e.message }, { status: 500 });
+  } catch (err: unknown) {
+    console.error("[/api/tryon] Error:", err);
+    const message = err instanceof Error ? err.message : "Unknown error";
+    return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }
