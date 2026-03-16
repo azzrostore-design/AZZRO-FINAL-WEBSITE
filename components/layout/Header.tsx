@@ -1,5 +1,5 @@
 'use client';
-
+import Image from "next/image";
 import { useEffect, useRef, useState, useCallback } from 'react';
 import Link from "next/link";
 import { useRouter } from 'next/navigation';
@@ -540,7 +540,14 @@ export function Header() {
                         <div className="flex items-center gap-3">
                             <button className="md:hidden p-2 -ml-2 text-gray-700"><Menu className="w-6 h-6" /></button>
                             <Link href="/" className="flex-shrink-0">
-                                <h1 className="text-2xl md:text-3xl font-extrabold tracking-tighter text-primary">AZZRO</h1>
+                                <Image
+                                 src="/azzrologo.png"
+                                 alt="AZZRO"
+                                 width={120}
+                                 height={40}
+                                 priority
+                                 className="object-contain mr-auto"
+                                />
                             </Link>
                         </div>
                         <div className="flex md:hidden items-center gap-4">
