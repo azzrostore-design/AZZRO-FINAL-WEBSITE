@@ -60,17 +60,13 @@ async function getFit(resultUrl: string, name: string, type: string, falKey: str
     return def;
   }
 }
-
  export async function POST(req: NextRequest) {
    try {
-
      let human_image: any;
      let cloth_image: any;
      let cloth_type = "upper_body";
      let garment_name = "Garment";
-
      const contentType = req.headers.get("content-type") || "";
-
      if (contentType.includes("application/json")) {
        const body = await req.json();
        human_image = body.human_image;
