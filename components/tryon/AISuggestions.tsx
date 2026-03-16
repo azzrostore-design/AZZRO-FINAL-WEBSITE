@@ -41,10 +41,10 @@ export default function AISuggestions({ onClose }: { onClose?: () => void }) {
     setInput(""); setLoading(true);
     try {
       const history = messages.filter(m=>!m.isLoading).map(m=>({role:m.role,content:m.text||""}));
-      const res = await fetch("https://api.anthropic.com/v1/messages",{
+      const res = await fetch("/api/ai",{
         method:"POST", headers:{"Content-Type":"application/json"},
         body:JSON.stringify({
-          model:"claude-sonnet-4-20250514", max_tokens:1000,
+          max_tokens:1000,
           system:`You are Azzro's AI fashion stylist. When user asks for outfit suggestions, write a short friendly reply then append:
 OUTFITS_JSON:{"outfits":[{"label":"Name","tag":"Style · Occasion","match":95,"items":["item1","item2","item3"],"color":"#FDE8E8","accent":"#E84C6B","emoji":"👗","tip":"Brief tip"}]}
 For general questions answer naturally without JSON.`,
@@ -52,7 +52,7 @@ For general questions answer naturally without JSON.`,
         }),
       });
       const data = await res.json();
-      const full = data.content?.map((c:any)=>c.text||"").join("")||"";
+      const full = data.text||"";
       let replyText=full; let outfits:Outfit[]|undefined;
       if(full.includes("OUTFITS_JSON:")){
         const [pre,json]=full.split("OUTFITS_JSON:");
