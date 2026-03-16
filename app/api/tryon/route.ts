@@ -49,47 +49,36 @@ function safeParseJSON(text: string): any {
   }
 }
 
-/* ─── Run Claude fit analysis on result image ───────────────── */
+/* ─── Run fit analysis using fal.ai LLM ─────────────────────── */
 async function getFitAnalysis(
   resultUrl: string,
   garmentName: string,
   clothType: string
 ): Promise<{ score: number; tip: string }> {
   const DEFAULT = { score: 85, tip: "Great choice! This garment suits your style perfectly." };
-
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return DEFAULT;
+  const FAL_KEY = process.env.FAL_KEY;
+  if (!FAL_KEY) return DEFAULT;
 
   try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
+    const prompt = `You are a fashion expert. A person is wearing "${garmentName}" (${clothType.replace("_"," ")}). Rate the fit 1-100 and give a 1-sentence styling tip. Reply ONLY valid JSON like this exact format: {"score":85,"tip":"The outfit looks great on you!"}`;
+
+    const res = await fetch("https://fal.run/fal-ai/any-llm", {
       method:  "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key":    apiKey,
-        "anthropic-version": "2023-06-01",
-      },
+      headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model:      "claude-sonnet-4-20250514",
-        max_tokens: 150,
-        system:     "You are a fashion expert. Respond ONLY with valid JSON, no markdown, no extra text. Example: {\"score\":85,\"tip\":\"Looks great!\"}",
-        messages: [{
-          role: "user",
-          content: [
-            { type: "image", source: { type: "url", url: resultUrl } },
-            { type: "text",  text: `Rate how well "${garmentName}" (${clothType.replace("_"," ")}) fits this person. Return JSON only: {"score": <number 1-100>, "tip": "<one sentence styling tip>"}` },
-          ],
-        }],
+        model:      "meta-llama/llama-3.1-8b-instruct",
+        prompt,
+        max_tokens: 100,
       }),
     });
 
     if (!res.ok) return DEFAULT;
-
-    const data = await res.json();
-    const raw  = data.content?.map((c: any) => c.text || "").join("") || "";
+    const data   = await res.json();
+    const raw    = data.output || data.text || data.response || "";
     const parsed = safeParseJSON(raw);
 
-    if (parsed && typeof parsed.score === "number" && typeof parsed.tip === "string") {
-      return { score: Math.min(100, Math.max(1, parsed.score)), tip: parsed.tip };
+    if (parsed && typeof parsed.score === "number") {
+      return { score: Math.min(100, Math.max(1, parsed.score)), tip: parsed.tip || DEFAULT.tip };
     }
     return DEFAULT;
   } catch {
