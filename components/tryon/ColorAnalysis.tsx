@@ -52,12 +52,14 @@ export default function ColorAnalysis({ onClose }: { onClose?: () => void }) {
           ]
         : [{type:"text",text:`For ${tone?.label} (${tone?.season}) skin, give fashion color advice as JSON: {"season":"${tone?.season}","undertone":"Warm","skinTone":"${tone?.label}","bestColors":["c1","c2","c3","c4"],"avoidColors":["c1","c2"],"outfit_tip":"Specific tip","celebrity":"Bollywood or Hollywood celeb","confidence":89}`}];
 
-      const res = await fetch("https://api.anthropic.com/v1/messages",{
+      const res = await fetch("/api/ai",{
         method:"POST", headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,system:"You are a professional color analysis expert. Respond ONLY valid JSON no markdown.",messages:[{role:"user",content:userContent}]}),
+        body:JSON.stringify({max_tokens:1000,
+system:"You are a professional color analysis expert. Respond ONLY valid JSON no markdown.",
+messages:[{role:"user",content:userContent}]}),
       });
       const data = await res.json();
-      const txt  = data.content?.map((c:any)=>c.text||"").join("")||"";
+      const txt  = data.text||"";
       setAiResult(JSON.parse(txt.replace(/```json|```/g,"").trim()));
     } catch { setAiResult(null); }
     setAnalyzed(true); setLoading(false);
