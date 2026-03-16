@@ -3,7 +3,7 @@ import { HeroBanner } from "@/components/ui/HeroBanner";
 import { CategoryRail } from "@/components/ui/CategoryRail";
 import { ProductGrid } from "@/components/ui/ProductGrid";
 import { DealsSection } from "@/components/ui/DealsSection";
-import AIFeaturesSection from "@/components/AISuggestionSection";
+import AIFeaturesSection from "@/components/AIFeaturesSection";
 import Image from "next/image";
 
 async function getProducts() {
