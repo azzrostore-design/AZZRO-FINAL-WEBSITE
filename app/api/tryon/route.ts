@@ -6,7 +6,7 @@ export const maxDuration = 60;
 /* ─── Upload base64 image to fal.ai storage ─────────────────── */
 async function uploadToFal(base64DataUrl: string, falKey: string): Promise<string> {
   const match = base64DataUrl.match(/^data:(.+?);base64,(.+)$/);
-  if (!match) throw new Error("Invalid image format – expected data:…;base64,…");
+  if (!match) throw new Error("Invalid image format - expected data:...;base64,...");
 
   const mimeType = match[1];
   const b64data  = match[2];
@@ -36,7 +36,7 @@ async function uploadToFal(base64DataUrl: string, falKey: string): Promise<strin
   return j2.url as string;
 }
 
-/* ─── Safe JSON extractor – handles markdown fences + bad chars ─ */
+/* ─── Safe JSON extractor - handles markdown fences + bad chars ─ */
 function safeParseJSON(text: string): any {
   // Strip markdown code fences
   let cleaned = text.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
@@ -89,7 +89,18 @@ async function getFitAnalysis(
 /* ─── Main POST handler ──────────────────────────────────────── */
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
+    // Safe body parsing - handles malformed JSON
+    let body: any = {};
+    try {
+      const rawText = await req.text();
+      body = JSON.parse(rawText);
+    } catch (parseErr: any) {
+      return NextResponse.json(
+        { error: "Invalid request body: " + parseErr.message },
+        { status: 400 }
+      );
+    }
+
     const {
       human_image,
       cloth_image,
