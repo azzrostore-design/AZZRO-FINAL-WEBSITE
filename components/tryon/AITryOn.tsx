@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import ProductPickerModal from "./ProductPickerModal";
 import { imageUrlToBase64, type StoreProduct } from "@/lib/useStoreProducts";
 
-/* ─── Types ─────────────────────────────────────────── */
+/* --- Types ------------------------------------------- */
 type ClothType = "upper_body" | "lower_body" | "dresses";
 type Step      = "upload_person" | "upload_garment" | "configure" | "result";
 
@@ -20,7 +20,7 @@ interface TryOnState {
   fitNotes:       string | null;
 }
 
-/* ─── Garment → cloth type detection ───────────────── */
+/* --- Garment -> cloth type detection ----------------- */
 const CLOTH_TYPE_MAP: { kw: string[]; type: ClothType }[] = [
   { kw: ["saree","sari","lehenga","anarkali","gown","salwar","churidar","maxi","dress","frock","jumpsuit","co-ord","sharara"], type: "dresses"    },
   { kw: ["kurta","kurti","top","shirt","blouse","jacket","blazer","hoodie","sweater","tee","t-shirt","crop","polo","sweatshirt"], type: "upper_body" },
@@ -32,7 +32,7 @@ function detectClothType(name: string): ClothType {
   return "upper_body";
 }
 
-/* ─── Constants ─────────────────────────────────────── */
+/* --- Constants --------------------------------------- */
 const CLOTH_LABELS: Record<ClothType, { label: string; emoji: string; hint: string }> = {
   upper_body: { label: "Upper Body", emoji: "👕", hint: "Tops, shirts, kurtas, blouses, jackets" },
   lower_body: { label: "Lower Body", emoji: "👖", hint: "Pants, skirts, palazzo, trousers"       },
@@ -45,16 +45,16 @@ const STEPS: { id: Step; label: string; emoji: string }[] = [
   { id: "result",         label: "Result",     emoji: "🪞" },
 ];
 
-/* ─── Extract URL from fal.ai image object ──────────── */
+/* --- Extract URL from fal.ai image object ------------ */
 function extractUrl(imageObj: any): string {
   if (!imageObj) return "";
   if (typeof imageObj === "string") return imageObj;
   return imageObj.url || imageObj.cdn_url || imageObj.image_url || "";
 }
 
-/* ═══════════════════════════════════════════════════════
+/* =======================================================
    Component
-═══════════════════════════════════════════════════════ */
+======================================================= */
 export default function AITryOn({ onClose }: { onClose?: () => void }) {
   const [st, setSt] = useState<TryOnState>({
     personImage: null, garmentImage: null, garmentName: "",
@@ -89,7 +89,7 @@ export default function AITryOn({ onClose }: { onClose?: () => void }) {
   const wide = containerW >= 700;
   const up   = (p: Partial<TryOnState>) => setSt(s => ({ ...s, ...p }));
 
-  /* ── Read file as base64 ── */
+  /* -- Read file as base64 -- */
   const readFile = (file: File): Promise<string> =>
     new Promise((res, rej) => {
       const r = new FileReader();
@@ -98,14 +98,14 @@ export default function AITryOn({ onClose }: { onClose?: () => void }) {
       r.readAsDataURL(file);
     });
 
-  /* ── Person upload ── */
+  /* -- Person upload -- */
   const onPersonFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]; if (!f) return;
     up({ personImage: await readFile(f), error: null });
     setStep("upload_garment");
   };
 
-  /* ── Camera ── */
+  /* -- Camera -- */
   const startCamera = async () => {
     try {
       const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
@@ -126,7 +126,7 @@ export default function AITryOn({ onClose }: { onClose?: () => void }) {
     setStep("upload_garment");
   };
 
-  /* ── Garment: file upload ── */
+  /* -- Garment: file upload -- */
   const onGarmentFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]; if (!f) return;
     const name = f.name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " ");
@@ -134,7 +134,7 @@ export default function AITryOn({ onClose }: { onClose?: () => void }) {
     setStep("configure");
   };
 
-  /* ── Garment: from store ── */
+  /* -- Garment: from store -- */
   const onProductSelect = async (product: StoreProduct) => {
     setShowPicker(false); setLoadingProduct(true);
     try {
@@ -147,7 +147,7 @@ export default function AITryOn({ onClose }: { onClose?: () => void }) {
     setLoadingProduct(false);
   };
 
-  /* ── fal.ai CatVTON ── */
+  /* -- fal.ai CatVTON -- */
   const runTryOn = async () => {
     if (!st.personImage || !st.garmentImage) return;
     up({ loading: true, error: null, result: null, fitScore: null, fitNotes: null });
@@ -174,15 +174,14 @@ export default function AITryOn({ onClose }: { onClose?: () => void }) {
         throw new Error(errMsg);
       }
 
-      /* Extract result URL */
+      /* Extract result URL - handle all possible shapes */
       const resultUrl = data.result_url || extractUrl(data.image);
       if (!resultUrl) {
         const raw = JSON.stringify(data);
-        setDebugInfo("No URL found: " + raw.slice(0, 200));
+        setDebugInfo(`No URL found in response: ${raw.slice(0, 200)}`);
         throw new Error("Try-on completed but no output image URL found.");
       }
 
-      /* Fit score comes from /api/tryon response (server-side, safe) */
       const fitScore = typeof data.fit_score === "number" ? data.fit_score : 85;
       const fitNotes = typeof data.fit_tip === "string" ? data.fit_tip : "Looks great on you!";
 
@@ -193,7 +192,7 @@ export default function AITryOn({ onClose }: { onClose?: () => void }) {
     }
   };
 
-  /* ── Helpers ── */
+  /* -- Helpers -- */
   const reset = () => {
     setSt({ personImage: null, garmentImage: null, garmentName: "", garmentProduct: null, clothType: "upper_body", result: null, loading: false, error: null, fitScore: null, fitNotes: null });
     setStep("upload_person"); setDebugInfo("");
@@ -202,9 +201,9 @@ export default function AITryOn({ onClose }: { onClose?: () => void }) {
   const scoreColor = (n: number) => n >= 85 ? "#22C55E" : n >= 70 ? "#F59E0B" : "#EF4444";
   const scoreLabel = (n: number) => n >= 85 ? "Excellent Fit" : n >= 70 ? "Good Fit" : "Fair Fit";
 
-  /* ══════════════════════════════════════════════════
+  /* ==================================================
      PANELS
-  ══════════════════════════════════════════════════ */
+  ================================================== */
 
   /* Step bar */
   const StepBar = () => (
@@ -261,12 +260,12 @@ export default function AITryOn({ onClose }: { onClose?: () => void }) {
           <div onClick={startCamera} style={{ borderRadius:16, border:"2px dashed #E8E4DF", background:"#fff", padding:"18px", display:"flex", alignItems:"center", gap:14, cursor:"pointer" }}>
             <div style={{ width:46, height:46, borderRadius:12, background:"linear-gradient(135deg,#1A1A1A,#3D3D3D)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, flexShrink:0 }}>📷</div>
             <div><div style={{ fontWeight:700, fontSize:14, color:"#1A1A1A", marginBottom:2 }}>Take a Selfie</div><div style={{ fontSize:12, color:"#8B8B8B" }}>Use your camera for best results</div></div>
-            <div style={{ marginLeft:"auto", color:"#C9A96E", fontSize:16 }}>→</div>
+            <div style={{ marginLeft:"auto", color:"#C9A96E", fontSize:16 }}>-></div>
           </div>
           <div onClick={() => personFileRef.current?.click()} style={{ borderRadius:16, border:"2px dashed #E8E4DF", background:"#fff", padding:"18px", display:"flex", alignItems:"center", gap:14, cursor:"pointer" }}>
             <div style={{ width:46, height:46, borderRadius:12, background:"linear-gradient(135deg,#C9A96E,#E8C88A)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, flexShrink:0 }}>🖼️</div>
             <div><div style={{ fontWeight:700, fontSize:14, color:"#1A1A1A", marginBottom:2 }}>Upload a Photo</div><div style={{ fontSize:12, color:"#8B8B8B" }}>JPG / PNG · Full or half body</div></div>
-            <div style={{ marginLeft:"auto", color:"#C9A96E", fontSize:16 }}>→</div>
+            <div style={{ marginLeft:"auto", color:"#C9A96E", fontSize:16 }}>-></div>
           </div>
           <input ref={personFileRef} type="file" accept="image/*" style={{ display:"none" }} onChange={onPersonFile} />
         </div>
@@ -285,7 +284,7 @@ export default function AITryOn({ onClose }: { onClose?: () => void }) {
       {st.personImage && (
         <button onClick={() => setStep("upload_garment")}
           style={{ width:"100%", padding:"14px", borderRadius:13, background:"linear-gradient(135deg,#1A1A1A,#3D3D3D)", border:"none", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" }}>
-          Continue → Select Garment
+          Continue -> Select Garment
         </button>
       )}
     </div>
@@ -307,7 +306,7 @@ export default function AITryOn({ onClose }: { onClose?: () => void }) {
           <div style={{ fontWeight:700, fontSize:14, color:"#1A1A1A", marginBottom:2 }}>Browse Azzro Store</div>
           <div style={{ fontSize:12, color:"#8B6914" }}>Try on products from our catalog</div>
         </div>
-        <div style={{ marginLeft:"auto", color:"#C9A96E", fontSize:16, fontWeight:700 }}>→</div>
+        <div style={{ marginLeft:"auto", color:"#C9A96E", fontSize:16, fontWeight:700 }}>-></div>
       </div>
 
       <div style={{ display:"flex", alignItems:"center", gap:10 }}>
@@ -319,7 +318,7 @@ export default function AITryOn({ onClose }: { onClose?: () => void }) {
       {loadingProduct ? (
         <div style={{ display:"flex", alignItems:"center", justifyContent:"center", height:180, gap:10, background:"#fff", borderRadius:16, border:"1px solid #F0EDE8" }}>
           <div className="az-spin" style={{ width:28, height:28 }} />
-          <span style={{ fontSize:13, color:"#C9A96E", fontWeight:600 }}>Loading product...</span>
+          <span style={{ fontSize:13, color:"#C9A96E", fontWeight:600 }}>Loading product…</span>
         </div>
       ) : st.garmentImage ? (
         <div style={{ position:"relative", borderRadius:16, overflow:"hidden", aspectRatio:"3/4", background:"#F5F0EA" }}>
@@ -355,7 +354,7 @@ export default function AITryOn({ onClose }: { onClose?: () => void }) {
           </div>
           <button onClick={() => setStep("configure")}
             style={{ width:"100%", padding:"14px", borderRadius:13, background:"linear-gradient(135deg,#1A1A1A,#3D3D3D)", border:"none", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" }}>
-            Continue → Configure
+            Continue -> Configure
           </button>
         </>
       )}
@@ -436,7 +435,7 @@ export default function AITryOn({ onClose }: { onClose?: () => void }) {
             <div style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center", fontSize:26 }}>✨</div>
           </div>
           <div style={{ textAlign:"center" }}>
-            <div style={{ fontFamily:"'Playfair Display',serif", fontSize:18, fontWeight:700, color:"#1A1A1A", marginBottom:5 }}>Fitting your look...</div>
+            <div style={{ fontFamily:"'Playfair Display',serif", fontSize:18, fontWeight:700, color:"#1A1A1A", marginBottom:5 }}>Fitting your look…</div>
             <div style={{ fontSize:13, color:"#8B8B8B", lineHeight:1.6 }}>AI is virtually trying the garment on you.<br />This takes 15-30 seconds.</div>
           </div>
           <div style={{ width:"70%", height:3, borderRadius:2, background:"#F0EDE8", overflow:"hidden" }}>
@@ -531,7 +530,7 @@ export default function AITryOn({ onClose }: { onClose?: () => void }) {
           </div>
           <button onClick={reset}
             style={{ width:"100%", padding:"12px", borderRadius:11, background:"transparent", border:"1.5px solid #E8E4DF", color:"#8B8B8B", fontSize:13, cursor:"pointer" }}>
-            Try Another Look →
+            Try Another Look ->
           </button>
         </>
       ) : null}
@@ -547,7 +546,7 @@ export default function AITryOn({ onClose }: { onClose?: () => void }) {
     }
   };
 
-  /* ══ LAYOUT ═════════════════════════════════════════════════ */
+  /* == LAYOUT ================================================= */
   return (
     <>
       <div ref={containerRef} style={{ fontFamily:"'DM Sans',sans-serif", background:"#FAFAF8", width:"100%", height:"100%", display:"flex", flexDirection:"column", overflow:"hidden", borderRadius:"inherit" }}>
@@ -569,7 +568,7 @@ export default function AITryOn({ onClose }: { onClose?: () => void }) {
                 const prev: Record<Step, Step> = { upload_garment:"upload_person", configure:"upload_garment", result:"configure", upload_person:"upload_person" };
                 setStep(prev[step]);
               } else { onClose?.(); }
-            }} style={{ background:"none", border:"none", fontSize:20, cursor:"pointer", color:"#1A1A1A", padding:0, lineHeight:1 }}>←</button>
+            }} style={{ background:"none", border:"none", fontSize:20, cursor:"pointer", color:"#1A1A1A", padding:0, lineHeight:1 }}><-</button>
             <div>
               <h1 style={{ fontFamily:"'Playfair Display',serif", fontSize: wide ? 20 : 16, fontWeight:700, color:"#1A1A1A", margin:0 }}>FIT ME</h1>
               <p style={{ fontSize:11, color:"#8B8B8B", margin:0, marginTop:1 }}>AI Virtual Try-On · Azzro</p>
@@ -614,7 +613,7 @@ export default function AITryOn({ onClose }: { onClose?: () => void }) {
                 {st.garmentProduct && (
                   <button style={{ width:"100%", padding:"13px", borderRadius:11, background:"linear-gradient(135deg,#C9A96E,#E8C88A)", border:"none", color:"#1A1A1A", fontSize:13, fontWeight:700, cursor:"pointer" }}>🛒 Add to Bag</button>
                 )}
-                <button onClick={reset} style={{ width:"100%", padding:"11px", borderRadius:11, background:"transparent", border:"1.5px solid #E8E4DF", color:"#8B8B8B", fontSize:12, cursor:"pointer" }}>Try Another Look →</button>
+                <button onClick={reset} style={{ width:"100%", padding:"11px", borderRadius:11, background:"transparent", border:"1.5px solid #E8E4DF", color:"#8B8B8B", fontSize:12, cursor:"pointer" }}>Try Another Look -></button>
               </div>
             </div>
           ) : (
