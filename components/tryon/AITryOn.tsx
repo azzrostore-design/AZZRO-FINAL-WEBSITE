@@ -155,14 +155,15 @@ export default function AITryOn({ onClose }: { onClose?: () => void }) {
     setStep("result");
 
     try {
-      /* Call our Next.js API route which handles fal.ai */
+      /* Call our Next.js API route — handles fal.ai + fit analysis server-side */
       const res = await fetch("/api/tryon", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          human_image: st.personImage,
-          cloth_image: st.garmentImage,
-          cloth_type:  st.clothType,
+          human_image:  st.personImage,
+          cloth_image:  st.garmentImage,
+          cloth_type:   st.clothType,
+          garment_name: st.garmentName || "Garment",
         }),
       });
 
@@ -174,41 +175,17 @@ export default function AITryOn({ onClose }: { onClose?: () => void }) {
         throw new Error(errMsg);
       }
 
-      /* Extract result URL – handle all possible shapes */
-      const resultUrl = extractUrl(data.image);
+      /* result_url comes directly from server — no client-side parsing needed */
+      const resultUrl = data.result_url || extractUrl(data.image);
       if (!resultUrl) {
         const raw = JSON.stringify(data);
-        setDebugInfo(`No URL found in response: ${raw.slice(0, 200)}`);
+        setDebugInfo(`No URL found: ${raw.slice(0, 200)}`);
         throw new Error("Try-on completed but no output image URL found.");
       }
 
-      /* ── AI fit analysis via Claude ── */
-      let fitScore = 88;
-      let fitNotes = "Great choice! This garment suits your style perfectly.";
-      try {
-        const ar = await fetch("https://api.anthropic.com/v1/messages", {
-          method:  "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            model:      "claude-sonnet-4-20250514",
-            max_tokens: 200,
-            messages: [{
-              role: "user",
-              content: [
-                { type: "image", source: { type: "url", url: resultUrl } },
-                { type: "text",  text: `Fashion expert: rate fit of "${st.garmentName}" (${st.clothType.replace("_", " ")}) on this person. Score 1–100 + 1-sentence tip. ONLY JSON: {"score":85,"tip":"..."}` },
-              ],
-            }],
-          }),
-        });
-        if (ar.ok) {
-          const ad  = await ar.json();
-          const txt = ad.content?.map((c: any) => c.text || "").join("").replace(/```json|```/g, "").trim();
-          const p   = JSON.parse(txt);
-          if (p.score) fitScore = p.score;
-          if (p.tip)   fitNotes = p.tip;
-        }
-      } catch { /* keep defaults */ }
+      /* fit score & tip come from server-side Claude call — always safe */
+      const fitScore = typeof data.fit_score === "number" ? data.fit_score : 85;
+      const fitNotes = typeof data.fit_tip   === "string" ? data.fit_tip   : "Great choice! This garment suits your style perfectly.";
 
       up({ loading: false, result: resultUrl, fitScore, fitNotes });
 
