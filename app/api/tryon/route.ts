@@ -19,19 +19,8 @@ export async function POST(req: NextRequest) {
   try {
     const raw = await req.text();
 
-    // ── FULL DEBUG INFO ──────────────────────────────────────────
-    const debugInfo = {
-      bodyLength:   raw.length,
-      first200:     raw.slice(0, 200),
-      charCode0:    raw.charCodeAt(0),
-      charCode1:    raw.charCodeAt(1),
-      isEmpty:      raw.trim() === "",
-    };
-    console.log("[tryon DEBUG]", JSON.stringify(debugInfo, null, 2));
-    // ────────────────────────────────────────────────────────────
-
     if (!raw || raw.trim() === "") {
-      return NextResponse.json({ error: "Empty body", debug: debugInfo }, { status: 400 });
+      return NextResponse.json({ error: "Empty request body" }, { status: 400 });
     }
 
     let body: any;
@@ -40,7 +29,7 @@ export async function POST(req: NextRequest) {
     } catch (e: any) {
       return NextResponse.json({
         error: "JSON parse failed: " + e.message,
-        debug: debugInfo,
+        first100: raw.slice(0, 100),
       }, { status: 400 });
     }
 
@@ -49,16 +38,22 @@ export async function POST(req: NextRequest) {
     const cloth_type  = body.cloth_type || "upper_body";
 
     if (!human_image || typeof human_image !== "string") {
-      return NextResponse.json({ error: "human_image missing", type: typeof human_image }, { status: 400 });
+      return NextResponse.json({ error: "human_image missing or invalid" }, { status: 400 });
     }
     if (!cloth_image || typeof cloth_image !== "string") {
-      return NextResponse.json({ error: "cloth_image missing", type: typeof cloth_image }, { status: 400 });
+      return NextResponse.json({ error: "cloth_image missing or invalid" }, { status: 400 });
     }
     if (!human_image.startsWith("data:image/")) {
-      return NextResponse.json({ error: "human_image not valid base64", starts: human_image.slice(0, 80) }, { status: 400 });
+      return NextResponse.json({
+        error: "human_image is not a valid base64 image",
+        starts: human_image.slice(0, 80),
+      }, { status: 400 });
     }
     if (!cloth_image.startsWith("data:image/")) {
-      return NextResponse.json({ error: "cloth_image not valid base64", starts: cloth_image.slice(0, 80) }, { status: 400 });
+      return NextResponse.json({
+        error: "cloth_image is not a valid base64 image",
+        starts: cloth_image.slice(0, 80),
+      }, { status: 400 });
     }
 
     const FAL_KEY = process.env.FAL_KEY;
@@ -82,10 +77,15 @@ export async function POST(req: NextRequest) {
       headers: { "Authorization": "Key " + FAL_KEY, "Content-Type": "application/json" },
       body:    JSON.stringify({ human_image_url: humanUrl, cloth_image_url: clothUrl, cloth_type }),
     });
-    if (!sub.ok) return NextResponse.json({ error: "FAL submit: " + sub.status + " " + await sub.text() }, { status: 502 });
+    if (!sub.ok) {
+      return NextResponse.json({
+        error: "FAL submit failed: " + sub.status,
+        body:  await sub.text(),
+      }, { status: 502 });
+    }
 
     const { request_id } = await sub.json();
-    if (!request_id) return NextResponse.json({ error: "No request_id" }, { status: 502 });
+    if (!request_id) return NextResponse.json({ error: "No request_id from FAL" }, { status: 502 });
 
     const end = Date.now() + 55000;
     while (Date.now() < end) {
@@ -97,14 +97,22 @@ export async function POST(req: NextRequest) {
       const d = await p.json();
       if (d.status === "COMPLETED") {
         const img = d.output?.image || d.output?.images?.[0] || d.images?.[0] || d.image;
-        if (!img) return NextResponse.json({ error: "No image in response" }, { status: 502 });
+        if (!img) return NextResponse.json({ error: "No image in FAL response" }, { status: 502 });
         const url = typeof img === "string" ? img : img.url || img.cdn_url || "";
-        return NextResponse.json({ success: true, result_url: url, image: img, fit_score: 85, fit_tip: "Looks great on you!" });
+        return NextResponse.json({
+          success:    true,
+          result_url: url,
+          image:      img,
+          fit_score:  85,
+          fit_tip:    "Looks great on you!",
+        });
       }
-      if (d.status === "FAILED") return NextResponse.json({ error: "FAL failed: " + (d.error || "unknown") }, { status: 502 });
+      if (d.status === "FAILED") {
+        return NextResponse.json({ error: "FAL failed: " + (d.error || "unknown") }, { status: 502 });
+      }
     }
 
-    return NextResponse.json({ error: "Timeout" }, { status: 504 });
+    return NextResponse.json({ error: "Timeout waiting for result" }, { status: 504 });
 
   } catch (e: any) {
     console.error("[/api/tryon]", e);
