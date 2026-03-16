@@ -155,7 +155,7 @@ export default function AITryOn({ onClose }: { onClose?: () => void }) {
     setStep("result");
 
     try {
-      /* Call our Next.js API route — handles fal.ai + fit analysis server-side */
+      /* Call our Next.js API route - handles fal.ai + fit analysis server-side */
       const res = await fetch("/api/tryon", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
@@ -175,7 +175,7 @@ export default function AITryOn({ onClose }: { onClose?: () => void }) {
         throw new Error(errMsg);
       }
 
-      /* result_url comes directly from server — no client-side parsing needed */
+      /* result_url comes directly from server - no client-side parsing needed */
       const resultUrl = data.result_url || extractUrl(data.image);
       if (!resultUrl) {
         const raw = JSON.stringify(data);
@@ -183,7 +183,7 @@ export default function AITryOn({ onClose }: { onClose?: () => void }) {
         throw new Error("Try-on completed but no output image URL found.");
       }
 
-      /* fit score & tip come from server-side Claude call — always safe */
+      /* fit score & tip come from server-side Claude call - always safe */
       const fitScore = typeof data.fit_score === "number" ? data.fit_score : 85;
       const fitNotes = typeof data.fit_tip   === "string" ? data.fit_tip   : "Great choice! This garment suits your style perfectly.";
 
@@ -228,7 +228,7 @@ export default function AITryOn({ onClose }: { onClose?: () => void }) {
     </div>
   );
 
-  /* Step 1 — Your Photo */
+  /* Step 1 - Your Photo */
   const PersonPanel = () => (
     <div style={{ display:"flex", flexDirection:"column", gap:14, maxWidth: wide ? 460 : "100%", margin:"0 auto" }}>
       <div style={{ textAlign:"center", paddingTop:4 }}>
@@ -292,7 +292,7 @@ export default function AITryOn({ onClose }: { onClose?: () => void }) {
     </div>
   );
 
-  /* Step 2 — Garment */
+  /* Step 2 - Garment */
   const GarmentPanel = () => (
     <div style={{ display:"flex", flexDirection:"column", gap:14, maxWidth: wide ? 460 : "100%", margin:"0 auto" }}>
       <div style={{ textAlign:"center", paddingTop:4 }}>
@@ -320,7 +320,7 @@ export default function AITryOn({ onClose }: { onClose?: () => void }) {
       {loadingProduct ? (
         <div style={{ display:"flex", alignItems:"center", justifyContent:"center", height:180, gap:10, background:"#fff", borderRadius:16, border:"1px solid #F0EDE8" }}>
           <div className="az-spin" style={{ width:28, height:28 }} />
-          <span style={{ fontSize:13, color:"#C9A96E", fontWeight:600 }}>Loading product…</span>
+          <span style={{ fontSize:13, color:"#C9A96E", fontWeight:600 }}>Loading product...</span>
         </div>
       ) : st.garmentImage ? (
         <div style={{ position:"relative", borderRadius:16, overflow:"hidden", aspectRatio:"3/4", background:"#F5F0EA" }}>
@@ -351,7 +351,7 @@ export default function AITryOn({ onClose }: { onClose?: () => void }) {
           <div style={{ background:"#fff", borderRadius:13, padding:14, border:"1px solid #F0EDE8" }}>
             <div style={{ fontSize:11, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.5px", color:"#1A1A1A", marginBottom:8 }}>Garment Name</div>
             <input value={st.garmentName} onChange={e => up({ garmentName: e.target.value, clothType: detectClothType(e.target.value) })}
-              placeholder="E.g. Floral Anarkali, White Linen Shirt…"
+              placeholder="E.g. Floral Anarkali, White Linen Shirt..."
               style={{ width:"100%", padding:"10px 12px", borderRadius:10, border:"1.5px solid #E8E4DF", background:"#FAFAF8", fontSize:13, color:"#1A1A1A", fontFamily:"'DM Sans',sans-serif", outline:"none" }} />
           </div>
           <button onClick={() => setStep("configure")}
@@ -363,7 +363,7 @@ export default function AITryOn({ onClose }: { onClose?: () => void }) {
     </div>
   );
 
-  /* Step 3 — Configure */
+  /* Step 3 - Configure */
   const ConfigurePanel = () => (
     <div style={{ display:"flex", flexDirection:"column", gap:14, maxWidth: wide ? 460 : "100%", margin:"0 auto" }}>
       <div style={{ textAlign:"center", paddingTop:4 }}>
@@ -425,7 +425,7 @@ export default function AITryOn({ onClose }: { onClose?: () => void }) {
     </div>
   );
 
-  /* Step 4 — Result */
+  /* Step 4 - Result */
   const ResultPanel = () => (
     <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
       {st.loading ? (
@@ -437,8 +437,8 @@ export default function AITryOn({ onClose }: { onClose?: () => void }) {
             <div style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center", fontSize:26 }}>✨</div>
           </div>
           <div style={{ textAlign:"center" }}>
-            <div style={{ fontFamily:"'Playfair Display',serif", fontSize:18, fontWeight:700, color:"#1A1A1A", marginBottom:5 }}>Fitting your look…</div>
-            <div style={{ fontSize:13, color:"#8B8B8B", lineHeight:1.6 }}>AI is virtually trying the garment on you.<br />This takes 15–30 seconds.</div>
+            <div style={{ fontFamily:"'Playfair Display',serif", fontSize:18, fontWeight:700, color:"#1A1A1A", marginBottom:5 }}>Fitting your look...</div>
+            <div style={{ fontSize:13, color:"#8B8B8B", lineHeight:1.6 }}>AI is virtually trying the garment on you.<br />This takes 15-30 seconds.</div>
           </div>
           <div style={{ width:"70%", height:3, borderRadius:2, background:"#F0EDE8", overflow:"hidden" }}>
             <div style={{ height:"100%", borderRadius:2, background:"linear-gradient(90deg,#C9A96E,#E8C88A)", animation:"progress 25s linear forwards" }} />
