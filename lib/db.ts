@@ -1,10 +1,9 @@
 import mongoose from "mongoose";
 
-// ✅ FIX: was process.env.MONGO_URL — must match .env.local key exactly
 const MONGODB_URI = process.env.MONGODB_URI || "";
 
 if (!MONGODB_URI) {
-  console.warn("MONGODB_URI is missing. DB will not connect.");
+  console.warn("MONGODB_URI is missing in .env.local");
 }
 
 let cached = (global as any).mongoose;
@@ -16,8 +15,9 @@ export async function connectDB() {
   if (cached.conn) return cached.conn;
 
   if (!cached.promise) {
-    const opts = { bufferCommands: false };
-    cached.promise = mongoose.connect(MONGODB_URI, opts).then((m) => m);
+    cached.promise = mongoose.connect(MONGODB_URI, {
+      bufferCommands: false,
+    }).then(m => m);
   }
 
   try {
