@@ -3,6 +3,7 @@ import { HeroBanner } from "@/components/ui/HeroBanner";
 import { CategoryRail } from "@/components/ui/CategoryRail";
 import { ProductGrid } from "@/components/ui/ProductGrid";
 import { DealsSection } from "@/components/ui/DealsSection";
+import AIFeaturesSection from "@/components/AISuggestionSection";
 import Image from "next/image";
 
 async function getProducts() {
@@ -60,7 +61,10 @@ export default async function Home() {
       {/* 5️⃣ Products From MongoDB */}
       <ProductGrid title="Trending Products" products={products} />
 
-      {/* 6️⃣ Brand Highlights */}
+      {/* 6️⃣ AI Fashion Features */}
+      <AIFeaturesSection />
+
+      {/* 7️⃣ Brand Highlights */}
       <section className="py-12 bg-gray-50">
 
         <div className="container mx-auto px-4">

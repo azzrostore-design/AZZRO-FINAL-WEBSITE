@@ -26,15 +26,15 @@ export function ProductGrid({ title, products }: { title: string; products: Prod
                 {products.map((product, index) => {
 
                     const imageSrc =
-                        product.images?.[0] && product.images[0].trim() !== ""
-                            ? product.images[0]
+                        product.imageUrl && product.imageUrl.trim() !== ""
+                            ? product.imageUrl
                             : "/images/placeholder.png";
 
                     return (
 
                         <Link
-                            href={`/product/${product._id || product.id}`}
-                            key={product._id || product.id || index}
+                            href={`/product/${product.id}`}
+                            key={product.id || index}
                             className="group relative block"
                         >
 
