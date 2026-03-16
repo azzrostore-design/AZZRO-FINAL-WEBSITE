@@ -18,38 +18,38 @@ async function uploadToFal(base64DataUrl: string, falKey: string): Promise<strin
 export async function POST(req: NextRequest) {
   try {
     const raw = await req.text();
-    
-    // LOG: what is position 0 and 1?
-    const code0 = raw.charCodeAt(0);
-    const code1 = raw.charCodeAt(1);
-    console.log("[tryon] body length:", raw.length);
-    console.log("[tryon] first 100 chars:", raw.slice(0, 100));
-    console.log("[tryon] char[0]:", code0, "char[1]:", code1);
-    
-    // If body starts with - it means it got the string "-" not JSON
-    if (raw.trim() === '' || raw.trim() === '-' || raw.trim() === 'undefined') {
-      return NextResponse.json({ error: "Empty or invalid body received: " + JSON.stringify(raw.slice(0,50)) }, { status: 400 });
+
+    if (!raw || raw.trim() === "") {
+      return NextResponse.json({ error: "Empty request body" }, { status: 400 });
     }
 
     let body: any = {};
     try {
       body = JSON.parse(raw);
     } catch (e: any) {
-      // Return helpful debug info
       return NextResponse.json({
         error: "JSON parse failed: " + e.message,
         bodyLength: raw.length,
         first100: raw.slice(0, 100),
-        charCodes: Array.from(raw.slice(0, 20)).map(c => c.charCodeAt(0)),
       }, { status: 400 });
     }
 
     const human_image = body.human_image;
     const cloth_image = body.cloth_image;
-    const cloth_type = body.cloth_type || "upper_body";
+    const cloth_type  = body.cloth_type || "upper_body";
 
-    if (!human_image || !cloth_image) {
-      return NextResponse.json({ error: "missing images", keys: Object.keys(body) }, { status: 400 });
+    // Validate images are present and are valid base64 data URLs
+    if (!human_image || typeof human_image !== "string") {
+      return NextResponse.json({ error: "missing or invalid human_image" }, { status: 400 });
+    }
+    if (!cloth_image || typeof cloth_image !== "string") {
+      return NextResponse.json({ error: "missing or invalid cloth_image" }, { status: 400 });
+    }
+    if (!human_image.startsWith("data:image/")) {
+      return NextResponse.json({ error: "human_image is not a valid base64 image data URL" }, { status: 400 });
+    }
+    if (!cloth_image.startsWith("data:image/")) {
+      return NextResponse.json({ error: "cloth_image is not a valid base64 image data URL" }, { status: 400 });
     }
 
     const FAL_KEY = process.env.FAL_KEY;
@@ -58,7 +58,10 @@ export async function POST(req: NextRequest) {
     let humanUrl: string;
     let clothUrl: string;
     try {
-      const uploaded = await Promise.all([uploadToFal(human_image, FAL_KEY), uploadToFal(cloth_image, FAL_KEY)]);
+      const uploaded = await Promise.all([
+        uploadToFal(human_image, FAL_KEY),
+        uploadToFal(cloth_image, FAL_KEY),
+      ]);
       humanUrl = uploaded[0];
       clothUrl = uploaded[1];
     } catch (e: any) {
@@ -68,9 +71,18 @@ export async function POST(req: NextRequest) {
     const sub = await fetch("https://queue.fal.run/fal-ai/cat-vton", {
       method: "POST",
       headers: { "Authorization": "Key " + FAL_KEY, "Content-Type": "application/json" },
-      body: JSON.stringify({ human_image_url: humanUrl, cloth_image_url: clothUrl, cloth_type: cloth_type }),
+      body: JSON.stringify({
+        human_image_url: humanUrl,
+        cloth_image_url: clothUrl,
+        cloth_type:      cloth_type,
+      }),
     });
-    if (!sub.ok) return NextResponse.json({ error: "submit failed " + sub.status + " " + await sub.text() }, { status: 502 });
+    if (!sub.ok) {
+      return NextResponse.json(
+        { error: "submit failed " + sub.status + " " + await sub.text() },
+        { status: 502 }
+      );
+    }
 
     const { request_id } = await sub.json();
     if (!request_id) return NextResponse.json({ error: "no request_id" }, { status: 502 });
@@ -85,11 +97,22 @@ export async function POST(req: NextRequest) {
       const d = await p.json();
       if (d.status === "COMPLETED") {
         const img = d.output?.image || d.output?.images?.[0] || d.images?.[0] || d.image;
-        if (!img) return NextResponse.json({ error: "no image" }, { status: 502 });
+        if (!img) return NextResponse.json({ error: "no image in response" }, { status: 502 });
         const url = typeof img === "string" ? img : img.url || img.cdn_url || "";
-        return NextResponse.json({ success: true, result_url: url, image: img, fit_score: 85, fit_tip: "Looks great on you!" });
+        return NextResponse.json({
+          success:    true,
+          result_url: url,
+          image:      img,
+          fit_score:  85,
+          fit_tip:    "Looks great on you!",
+        });
       }
-      if (d.status === "FAILED") return NextResponse.json({ error: "failed: " + (d.error || "unknown") }, { status: 502 });
+      if (d.status === "FAILED") {
+        return NextResponse.json(
+          { error: "failed: " + (d.error || "unknown") },
+          { status: 502 }
+        );
+      }
     }
     return NextResponse.json({ error: "timeout" }, { status: 504 });
 
