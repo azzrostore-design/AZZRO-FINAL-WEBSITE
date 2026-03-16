@@ -61,20 +61,33 @@ async function getFit(resultUrl: string, name: string, type: string, falKey: str
   }
 }
 
-export async function POST(req: NextRequest) {
-  try {
-    let body: any = {};
-    try {
-      const raw = await req.text();
-      body = JSON.parse(raw);
-    } catch (e: any) {
-      return NextResponse.json({ error: "Bad request body: " + e.message }, { status: 400 });
-    }
+ export async function POST(req: NextRequest) {
+   try {
 
-    const human_image = body.human_image;
-    const cloth_image = body.cloth_image;
-    const cloth_type = body.cloth_type || "upper_body";
-    const garment_name = body.garment_name || "Garment";
+     let human_image: any;
+     let cloth_image: any;
+     let cloth_type = "upper_body";
+     let garment_name = "Garment";
+
+     const contentType = req.headers.get("content-type") || "";
+
+     if (contentType.includes("application/json")) {
+       const body = await req.json();
+       human_image = body.human_image;
+       cloth_image = body.cloth_image;
+       cloth_type = body.cloth_type || "upper_body";
+       garment_name = body.garment_name || "Garment";
+     }
+     else if (contentType.includes("multipart/form-data")) {
+       const form = await req.formData();
+       human_image = form.get("human_image");
+       cloth_image = form.get("cloth_image");
+       cloth_type = (form.get("cloth_type") as string) || "upper_body";
+       garment_name = (form.get("garment_name") as string) || "Garment";
+     }
+     else {
+       return NextResponse.json({ error: "Unsupported request type" }, { status: 400 });
+     }
 
     if (!human_image || !cloth_image) {
       return NextResponse.json({ error: "human_image and cloth_image required" }, { status: 400 });
