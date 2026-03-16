@@ -332,8 +332,8 @@ export default function AIFeaturesSection() {
     <section className="py-20 px-4 bg-white">
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-12">
-          <h2 className="text-4xl font-bold text-gray-900 mb-3">AI Fashion Features</h2>
-          <p className="text-gray-500 text-lg">Powered by AI, designed for you</p>
+          <h2 className="text-4xl font-bold text-gray-900 mb-3">Fashion Features by AZZRO</h2>
+          <p className="text-gray-500 text-lg">Powered by AZZRO, designed for your style</p>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-12">
