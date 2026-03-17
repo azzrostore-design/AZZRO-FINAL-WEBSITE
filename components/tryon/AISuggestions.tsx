@@ -1,227 +1,403 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
+import {
+  STORE_PRODUCTS,
+  getProductsByOccasion,
+  buildOutfitFromOccasion,
+  type StoreProduct,
+} from "@/lib/storeProducts";
 
-interface Props {
-  onBack: () => void;
-}
+// ── Constants ─────────────────────────────────────────────────────────────────
 
-const outfits = [
+const OCCASIONS = ["Date", "Coffee", "Interview", "Party", "Beach", "Casual", "Office", "Travel"];
+
+const STYLE_TAGS = ["Minimal", "Timeless", "Bohemian", "Streetwear", "Trendy", "Elegant"];
+
+const AI_STYLISTS = [
   {
-    id: 1,
-    title: "Casual Chic",
-    items: ["White Oversized Tee", "High-waist Jeans", "White Sneakers"],
-    tags: ["Casual", "Everyday"],
-    color: "#FFE8EC",
-    accent: "#c0485a",
-    emoji: "👗",
-    match: 96,
+    id: "eli",
+    name: "Eli",
+    style: "Minimal • Timeless",
+    desc: "Clean lines, neutral palettes",
+    avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face",
+    preferredTags: ["minimal", "timeless", "classic", "elegant"],
   },
   {
-    id: 2,
-    title: "Office Ready",
-    items: ["Blazer", "Tailored Trousers", "Loafers"],
-    tags: ["Formal", "Work"],
-    color: "#EAF0FF",
-    accent: "#3a5bd9",
-    emoji: "💼",
-    match: 91,
+    id: "zara",
+    name: "Zara",
+    style: "Trendy • Bold",
+    desc: "Fashion-forward, statement looks",
+    avatar: "https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=100&h=100&fit=crop&crop=face",
+    preferredTags: ["trendy", "streetwear", "bold"],
   },
   {
-    id: 3,
-    title: "Weekend Vibes",
-    items: ["Floral Midi Dress", "Strappy Sandals", "Tote Bag"],
-    tags: ["Boho", "Weekend"],
-    color: "#E8F9F0",
-    accent: "#1a8f52",
-    emoji: "🌸",
-    match: 88,
-  },
-  {
-    id: 4,
-    title: "Date Night",
-    items: ["Slip Dress", "Heeled Mules", "Mini Bag"],
-    tags: ["Elegant", "Evening"],
-    color: "#FFF0F8",
-    accent: "#a0288c",
-    emoji: "✨",
-    match: 85,
+    id: "maya",
+    name: "Maya",
+    style: "Bohemian • Earthy",
+    desc: "Natural textures, flowing silhouettes",
+    avatar: "https://images.unsplash.com/photo-1502823403499-6ccfcef4fb453?w=100&h=100&fit=crop&crop=face",
+    preferredTags: ["bohemian", "casual", "feminine"],
   },
 ];
 
-const moods = ["All", "Casual", "Formal", "Boho", "Elegant", "Sporty"];
+// ── Types ─────────────────────────────────────────────────────────────────────
 
-export default function AISuggestions({ onBack }: Props) {
-  const [selectedMood, setSelectedMood] = useState("All");
-  const [liked, setLiked] = useState<number[]>([]);
+interface OutfitBundle {
+  id: number;
+  title: string;
+  matchScore: number;
+  products: StoreProduct[];
+  liked: boolean;
+  totalPrice: number;
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
+
+export default function AISuggestions() {
+  const [step, setStep] = useState<"stylist" | "request" | "results">("stylist");
+  const [selectedStylist, setSelectedStylist] = useState(AI_STYLISTS[0]);
+  const [selectedOccasion, setSelectedOccasion] = useState("");
+  const [occasionOpen, setOccasionOpen] = useState(false);
+  const [vibeText, setVibeText] = useState("");
+  const [additionalPrompt, setAdditionalPrompt] = useState("");
   const [loading, setLoading] = useState(false);
-  const [photoUploaded, setPhotoUploaded] = useState(false);
+  const [outfits, setOutfits] = useState<OutfitBundle[]>([]);
+  const [expandedOutfit, setExpandedOutfit] = useState<number | null>(null);
 
-  const filtered = selectedMood === "All"
-    ? outfits
-    : outfits.filter(o => o.tags.includes(selectedMood));
+  // ── Generate outfits from store products ──────────────────────────────────
 
-  const handleRefresh = () => {
+  const generateOutfits = async () => {
+    if (!selectedOccasion) return;
     setLoading(true);
-    setTimeout(() => setLoading(false), 1200);
+    setStep("results");
+    await new Promise((r) => setTimeout(r, 1800));
+
+    const bundles: OutfitBundle[] = [];
+
+    for (let i = 0; i < 3; i++) {
+      const outfit = buildOutfitFromOccasion(selectedOccasion);
+      const products = Object.values(outfit).filter(Boolean) as StoreProduct[];
+
+      // Filter by stylist preferred tags where possible
+      const stylistFiltered = products.map((p) => {
+        const stylistMatch = STORE_PRODUCTS.find(
+          (sp) =>
+            sp.category === p.category &&
+            sp.occasions.includes(selectedOccasion.toLowerCase()) &&
+            selectedStylist.preferredTags.some((t) => sp.tags.includes(t)) &&
+            sp.inStock
+        );
+        return stylistMatch ?? p;
+      });
+
+      const unique = Array.from(new Map(stylistFiltered.map((p) => [p.id, p])).values());
+      const totalPrice = unique.reduce((sum, p) => sum + p.price, 0);
+      const score = Math.round(78 + Math.random() * 18);
+
+      bundles.push({
+        id: i + 1,
+        title: i === 0
+          ? `Perfect ${selectedOccasion} Look`
+          : i === 1
+          ? `Casual ${selectedOccasion} Vibe`
+          : `Chic ${selectedOccasion} Edit`,
+        matchScore: score,
+        products: unique,
+        liked: false,
+        totalPrice,
+      });
+    }
+
+    setOutfits(bundles);
+    setLoading(false);
   };
 
+  const toggleLike = (id: number) =>
+    setOutfits((prev) => prev.map((o) => (o.id === id ? { ...o, liked: !o.liked } : o)));
+
+  // ── Render ────────────────────────────────────────────────────────────────
+
   return (
-    <div className="min-h-screen bg-[#F7F5F2] font-['DM_Sans',sans-serif]">
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,600;1,500&display=swap');
-        * { box-sizing: border-box; }
-        .outfit-card { transition: transform 0.2s ease, box-shadow 0.2s ease; }
-        .outfit-card:hover { transform: translateY(-3px); box-shadow: 0 16px 40px rgba(0,0,0,0.1); }
-        .mood-pill { transition: all 0.2s ease; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .spinner { animation: spin 0.8s linear infinite; }
-        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
-        .pulse { animation: pulse 1s ease infinite; }
-      `}</style>
+    <div style={{ fontFamily: "'DM Sans', sans-serif", background: "#f8f6f2", minHeight: "100vh" }}>
+      <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@500;700&display=swap" rel="stylesheet" />
 
-      <div className="max-w-[430px] mx-auto min-h-screen bg-white shadow-2xl">
-
-        {/* Header */}
-        <div className="px-5 pt-14 pb-4 flex items-center gap-4">
-          <button onClick={onBack} className="w-9 h-9 rounded-full bg-[#F5F3EF] flex items-center justify-center">
-            <svg width="18" height="18" fill="none" stroke="#1a1a1a" strokeWidth="2" viewBox="0 0 24 24">
-              <path d="M19 12H5M12 19l-7-7 7-7"/>
-            </svg>
+      {/* ── Header ── */}
+      <div style={{
+        background: "#fff", padding: "20px 24px 16px", borderBottom: "1px solid #ece9e3",
+        display: "flex", alignItems: "center", gap: "12px", position: "sticky", top: 0, zIndex: 50,
+      }}>
+        {step !== "stylist" && (
+          <button onClick={() => setStep(step === "results" ? "request" : "stylist")}
+            style={{ background: "none", border: "none", cursor: "pointer", fontSize: "22px", color: "#1a1a1a" }}>
+            ←
           </button>
-          <div>
-            <h1 className="text-2xl font-['Playfair_Display'] font-semibold text-[#1a1a1a]">AI Suggestions</h1>
-            <p className="text-xs text-[#888]">Personalized for your style</p>
-          </div>
+        )}
+        <div>
+          <h1 style={{ margin: 0, fontSize: "20px", fontWeight: 700, fontFamily: "'Playfair Display', serif", color: "#1a1a1a" }}>
+            AI Suggestions
+          </h1>
+          <p style={{ margin: 0, fontSize: "12px", color: "#888" }}>Outfits from Azzro store</p>
         </div>
+      </div>
 
-        {/* Upload Photo Banner */}
-        <div className="mx-5 mb-4">
-          {!photoUploaded ? (
-            <button
-              onClick={() => setPhotoUploaded(true)}
-              className="w-full rounded-2xl border-2 border-dashed border-[#ddd] p-4 flex items-center gap-3 text-left hover:border-[#1a1a1a] transition-colors"
-            >
-              <div className="w-12 h-12 rounded-xl bg-[#F5F3EF] flex items-center justify-center text-2xl">📸</div>
-              <div>
-                <p className="text-sm font-semibold text-[#1a1a1a]">Upload your photo</p>
-                <p className="text-xs text-[#888]">Get outfits tailored to your body type</p>
-              </div>
-              <svg className="ml-auto" width="18" height="18" fill="none" stroke="#aaa" strokeWidth="2" viewBox="0 0 24 24">
-                <path d="M9 18l6-6-6-6"/>
-              </svg>
-            </button>
-          ) : (
-            <div className="w-full rounded-2xl bg-gradient-to-r from-[#E8F9F0] to-[#D0F0E0] p-4 flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center text-2xl">✅</div>
-              <div>
-                <p className="text-sm font-semibold text-[#1a8f52]">Photo uploaded!</p>
-                <p className="text-xs text-[#555]">Suggestions are now personalized</p>
-              </div>
-            </div>
-          )}
-        </div>
+      {/* ── Step 1: Choose Stylist ── */}
+      {step === "stylist" && (
+        <div style={{ padding: "24px", maxWidth: 640, margin: "0 auto" }}>
+          <h2 style={{ fontSize: "16px", fontWeight: 600, color: "#1a1a1a", marginBottom: "6px" }}>Choose Your AI Stylist</h2>
+          <p style={{ fontSize: "13px", color: "#888", marginBottom: "24px" }}>Each stylist curates from Azzro's catalog differently</p>
 
-        {/* Mood Filter */}
-        <div className="px-5 mb-4">
-          <p className="text-xs text-[#888] font-medium mb-2 uppercase tracking-wider">Filter by mood</p>
-          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-            {moods.map((mood) => (
-              <button
-                key={mood}
-                onClick={() => setSelectedMood(mood)}
-                className={`mood-pill flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium border transition-all ${
-                  selectedMood === mood
-                    ? "bg-[#1a1a1a] text-white border-[#1a1a1a]"
-                    : "bg-white text-[#555] border-[#E0DDD8]"
-                }`}
-              >
-                {mood}
-              </button>
+          <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+            {AI_STYLISTS.map((stylist) => (
+              <div key={stylist.id} onClick={() => setSelectedStylist(stylist)}
+                style={{
+                  background: "#fff", borderRadius: "16px", padding: "18px 20px",
+                  display: "flex", alignItems: "center", gap: "16px", cursor: "pointer",
+                  border: selectedStylist.id === stylist.id ? "2px solid #1a1a1a" : "2px solid transparent",
+                  boxShadow: "0 2px 12px rgba(0,0,0,0.06)", transition: "all 0.2s",
+                }}>
+                <div style={{ position: "relative" }}>
+                  <img src={stylist.avatar} alt={stylist.name}
+                    style={{ width: 60, height: 60, borderRadius: "50%", objectFit: "cover" }} />
+                  {selectedStylist.id === stylist.id && (
+                    <div style={{
+                      position: "absolute", bottom: 0, right: 0, width: 20, height: 20,
+                      borderRadius: "50%", background: "#1a1a1a", color: "#fff",
+                      display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px",
+                    }}>✓</div>
+                  )}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: "16px", fontWeight: 700, color: "#1a1a1a" }}>{stylist.name}</div>
+                  <div style={{ fontSize: "12px", color: "#888", marginBottom: "6px" }}>{stylist.style}</div>
+                  <div style={{ fontSize: "11px", background: "#f3f0ea", display: "inline-block", padding: "2px 10px", borderRadius: "20px", color: "#555" }}>
+                    {stylist.desc}
+                  </div>
+                </div>
+              </div>
             ))}
           </div>
+
+          <button onClick={() => setStep("request")}
+            style={{
+              width: "100%", padding: "16px", background: "#1a1a1a", color: "#fff",
+              border: "none", borderRadius: "14px", fontSize: "15px", fontWeight: 600,
+              cursor: "pointer", marginTop: "32px",
+            }}>
+            Continue with {selectedStylist.name}
+          </button>
         </div>
+      )}
 
-        {/* Outfits */}
-        <div className="px-5 pb-24">
-          {loading ? (
-            <div className="flex flex-col items-center justify-center py-16 gap-4">
-              <div className="spinner w-8 h-8 border-2 border-[#1a1a1a] border-t-transparent rounded-full"/>
-              <p className="text-sm text-[#888] pulse">Finding your perfect outfits...</p>
+      {/* ── Step 2: Request ── */}
+      {step === "request" && (
+        <div style={{ padding: "24px", maxWidth: 640, margin: "0 auto" }}>
+          {/* Stylist mini card */}
+          <div style={{
+            background: "#fff", borderRadius: "14px", padding: "16px 20px",
+            display: "flex", alignItems: "center", gap: "14px",
+            boxShadow: "0 2px 12px rgba(0,0,0,0.06)", marginBottom: "24px",
+          }}>
+            <img src={selectedStylist.avatar} alt={selectedStylist.name}
+              style={{ width: 48, height: 48, borderRadius: "50%", objectFit: "cover" }} />
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: "14px", fontWeight: 700, color: "#1a1a1a" }}>{selectedStylist.name}</div>
+              <div style={{ fontSize: "11px", color: "#aaa" }}>{selectedStylist.style} • AI Stylist ✦</div>
             </div>
-          ) : (
-            <div className="flex flex-col gap-4">
-              {filtered.map((outfit) => (
-                <div
-                  key={outfit.id}
-                  className="outfit-card rounded-3xl overflow-hidden"
-                  style={{ background: outfit.color }}
-                >
-                  <div className="p-5">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-2xl bg-white/60 flex items-center justify-center text-2xl">
-                          {outfit.emoji}
-                        </div>
-                        <div>
-                          <h3 className="font-semibold text-[#1a1a1a] text-base">{outfit.title}</h3>
-                          <div className="flex gap-1 mt-0.5">
-                            {outfit.tags.map(t => (
-                              <span key={t} className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-white/50" style={{ color: outfit.accent }}>
-                                {t}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-lg font-bold text-[#1a1a1a]">{outfit.match}%</div>
-                        <div className="text-[10px] text-[#666]">match</div>
-                      </div>
-                    </div>
+            <button onClick={() => setStep("stylist")}
+              style={{ background: "#f3f0ea", border: "none", borderRadius: "20px", padding: "6px 14px", fontSize: "12px", color: "#555", cursor: "pointer", fontWeight: 500 }}>
+              Change
+            </button>
+          </div>
 
-                    <div className="flex flex-col gap-1.5 mb-4">
-                      {outfit.items.map((item, i) => (
-                        <div key={i} className="flex items-center gap-2">
-                          <div className="w-1.5 h-1.5 rounded-full" style={{ background: outfit.accent }}/>
-                          <span className="text-sm text-[#444]">{item}</span>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="flex gap-2">
-                      <button
-                        className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90"
-                        style={{ background: outfit.accent }}
-                      >
-                        Try On Virtually
-                      </button>
-                      <button
-                        onClick={() => setLiked(prev => prev.includes(outfit.id) ? prev.filter(id => id !== outfit.id) : [...prev, outfit.id])}
-                        className="w-10 h-10 rounded-xl bg-white/60 flex items-center justify-center text-lg"
-                      >
-                        {liked.includes(outfit.id) ? "❤️" : "🤍"}
-                      </button>
-                    </div>
-                  </div>
+          {/* Occasion */}
+          <label style={{ fontSize: "14px", fontWeight: 600, color: "#1a1a1a", display: "block", marginBottom: "10px" }}>
+            Select Occasion
+          </label>
+          <div onClick={() => setOccasionOpen(!occasionOpen)}
+            style={{
+              background: "#fff", borderRadius: "12px", padding: "14px 16px",
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              border: "1.5px solid #ece9e3", cursor: "pointer", marginBottom: "4px",
+            }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <span>👗</span>
+              <span style={{ fontSize: "14px", color: selectedOccasion ? "#1a1a1a" : "#bbb" }}>
+                {selectedOccasion || "Choose an occasion"}
+              </span>
+            </div>
+            <span style={{ color: "#888", transition: "0.2s", transform: occasionOpen ? "rotate(180deg)" : "none" }}>▾</span>
+          </div>
+          {occasionOpen && (
+            <div style={{
+              background: "#fff", borderRadius: "12px", border: "1.5px solid #ece9e3",
+              overflow: "hidden", boxShadow: "0 8px 32px rgba(0,0,0,0.1)", marginBottom: "16px",
+            }}>
+              {OCCASIONS.map((occ) => (
+                <div key={occ} onClick={() => { setSelectedOccasion(occ); setOccasionOpen(false); }}
+                  style={{
+                    padding: "12px 16px", fontSize: "14px", cursor: "pointer",
+                    fontWeight: selectedOccasion === occ ? 600 : 400,
+                    background: selectedOccasion === occ ? "#f8f6f2" : "transparent",
+                    borderBottom: "1px solid #f0ede7", color: "#1a1a1a",
+                  }}>
+                  {occ}
                 </div>
               ))}
             </div>
           )}
 
-          <button
-            onClick={handleRefresh}
-            className="w-full mt-4 py-3.5 rounded-2xl border-2 border-[#1a1a1a] text-sm font-semibold text-[#1a1a1a] flex items-center justify-center gap-2 hover:bg-[#1a1a1a] hover:text-white transition-all"
-          >
-            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <path d="M23 4v6h-6M1 20v-6h6"/>
-              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-            </svg>
-            Generate New Suggestions
+          {/* Vibe */}
+          <input value={vibeText} onChange={(e) => setVibeText(e.target.value)}
+            placeholder="Describe the vibe... (e.g. boho summer dinner)"
+            style={{
+              width: "100%", padding: "14px 16px", background: "#fff",
+              border: "1.5px solid #ece9e3", borderRadius: "12px", fontSize: "14px",
+              color: "#1a1a1a", outline: "none", marginBottom: "16px", boxSizing: "border-box",
+            }} />
+
+          {/* Additional prompt */}
+          <label style={{ fontSize: "14px", fontWeight: 600, color: "#1a1a1a", display: "block", marginBottom: "8px" }}>
+            Additional Notes <span style={{ color: "#aaa", fontWeight: 400 }}>(optional)</span>
+          </label>
+          <textarea value={additionalPrompt} onChange={(e) => setAdditionalPrompt(e.target.value.slice(0, 200))}
+            placeholder="Body type, color preferences, budget..."
+            rows={3}
+            style={{
+              width: "100%", padding: "14px 16px", background: "#fff",
+              border: "1.5px solid #ece9e3", borderRadius: "12px", fontSize: "14px",
+              color: "#1a1a1a", outline: "none", resize: "none", boxSizing: "border-box", marginBottom: "4px",
+            }} />
+          <div style={{ fontSize: "11px", color: "#bbb", textAlign: "right", marginBottom: "28px" }}>
+            {additionalPrompt.length}/200
+          </div>
+
+          <button onClick={generateOutfits} disabled={!selectedOccasion}
+            style={{
+              width: "100%", padding: "16px",
+              background: selectedOccasion ? "#1a1a1a" : "#ccc",
+              color: "#fff", border: "none", borderRadius: "14px",
+              fontSize: "15px", fontWeight: 600, cursor: selectedOccasion ? "pointer" : "not-allowed",
+            }}>
+            ✦ Generate Outfits from Store
           </button>
         </div>
+      )}
 
-      </div>
+      {/* ── Step 3: Results ── */}
+      {step === "results" && (
+        <div style={{ padding: "24px", maxWidth: 720, margin: "0 auto" }}>
+          <h2 style={{ fontSize: "16px", fontWeight: 600, color: "#1a1a1a", marginBottom: "2px" }}>
+            Your Outfit Picks
+          </h2>
+          <p style={{ fontSize: "12px", color: "#888", marginBottom: "20px" }}>
+            Styled by {selectedStylist.name} · {selectedOccasion} occasion · From Azzro store
+          </p>
+
+          {loading ? (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "16px", padding: "60px 0" }}>
+              <div style={{
+                width: 48, height: 48, borderRadius: "50%",
+                border: "3px solid #f0ede7", borderTopColor: "#1a1a1a",
+                animation: "spin 0.8s linear infinite",
+              }} />
+              <p style={{ color: "#888", fontSize: "14px" }}>Curating from Azzro catalog...</p>
+              <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+              {outfits.map((outfit) => (
+                <div key={outfit.id} style={{
+                  background: "#fff", borderRadius: "20px", overflow: "hidden",
+                  boxShadow: "0 2px 16px rgba(0,0,0,0.07)",
+                }}>
+                  {/* Outfit header */}
+                  <div style={{ padding: "18px 20px 12px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <div>
+                      <div style={{ fontSize: "15px", fontWeight: 700, color: "#1a1a1a" }}>{outfit.title}</div>
+                      <div style={{ fontSize: "12px", color: "#888", marginTop: "2px" }}>
+                        {outfit.products.length} items · ₹{outfit.totalPrice.toLocaleString("en-IN")}
+                      </div>
+                    </div>
+                    <div style={{
+                      background: "#f0faf4", color: "#2a8a5a", borderRadius: "20px",
+                      padding: "4px 12px", fontSize: "13px", fontWeight: 700,
+                    }}>
+                      {outfit.matchScore}% match
+                    </div>
+                  </div>
+
+                  {/* Product scroll */}
+                  <div style={{
+                    display: "flex", gap: "10px", padding: "0 20px 16px",
+                    overflowX: "auto", scrollbarWidth: "none",
+                  }}>
+                    {outfit.products.map((product) => (
+                      <Link key={product.id} href={product.slug} style={{ textDecoration: "none", flexShrink: 0 }}>
+                        <div style={{ width: 110, cursor: "pointer" }}>
+                          <div style={{ borderRadius: "12px", overflow: "hidden", marginBottom: "8px", height: 130 }}>
+                            <img src={product.image} alt={product.name}
+                              style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                          </div>
+                          <div style={{ fontSize: "11px", fontWeight: 600, color: "#1a1a1a", lineHeight: 1.3 }}>
+                            {product.name}
+                          </div>
+                          <div style={{ fontSize: "11px", color: "#e07070", fontWeight: 600, marginTop: "2px" }}>
+                            ₹{product.price.toLocaleString("en-IN")}
+                          </div>
+                          <div style={{ fontSize: "10px", color: "#aaa" }}>{product.category}</div>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+
+                  {/* See more toggle */}
+                  <div
+                    onClick={() => setExpandedOutfit(expandedOutfit === outfit.id ? null : outfit.id)}
+                    style={{ padding: "0 20px 10px", cursor: "pointer" }}
+                  >
+                    <span style={{ fontSize: "12px", color: "#888", textDecoration: "underline" }}>
+                      {expandedOutfit === outfit.id ? "Show less" : "View all items →"}
+                    </span>
+                  </div>
+
+                  {/* Actions */}
+                  <div style={{ padding: "12px 20px 18px", display: "flex", gap: "10px", borderTop: "1px solid #f3f0ea" }}>
+                    <button onClick={() => toggleLike(outfit.id)}
+                      style={{
+                        flex: 1, padding: "10px", borderRadius: "10px",
+                        border: "1.5px solid #ece9e3",
+                        background: outfit.liked ? "#1a1a1a" : "#fff",
+                        color: outfit.liked ? "#fff" : "#1a1a1a",
+                        fontSize: "13px", fontWeight: 600, cursor: "pointer",
+                      }}>
+                      {outfit.liked ? "♥ Saved" : "♡ Save Look"}
+                    </button>
+                    <button
+                      style={{
+                        flex: 1, padding: "10px", borderRadius: "10px",
+                        background: "#1a1a1a", border: "none",
+                        color: "#fff", fontSize: "13px", fontWeight: 600, cursor: "pointer",
+                      }}>
+                      Shop All Items
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+              <button onClick={() => { setStep("request"); setOutfits([]); }}
+                style={{
+                  width: "100%", padding: "14px", background: "transparent",
+                  border: "1.5px solid #1a1a1a", borderRadius: "14px",
+                  fontSize: "14px", fontWeight: 600, cursor: "pointer", color: "#1a1a1a",
+                }}>
+                Try Another Occasion
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
