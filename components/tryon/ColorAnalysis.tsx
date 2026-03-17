@@ -1,341 +1,409 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
+import Link from "next/link";
+import { STORE_PRODUCTS, type StoreProduct } from "@/lib/storeProducts";
 
-interface Props {
-  onBack: () => void;
-}
+// ── Skin tones ────────────────────────────────────────────────────────────────
 
-const skinTones = [
-  { id: "fair", label: "Fair", hex: "#FDDBB4", season: "Winter / Summer" },
-  { id: "light", label: "Light", hex: "#F5C89A", season: "Spring / Summer" },
-  { id: "medium", label: "Medium", hex: "#E0A87C", season: "Spring / Autumn" },
-  { id: "tan", label: "Tan", hex: "#C68642", season: "Autumn / Summer" },
-  { id: "deep", label: "Deep", hex: "#8D5524", season: "Autumn / Winter" },
-  { id: "rich", label: "Rich", hex: "#4A2912", season: "Winter / Deep" },
+const SKIN_TONES = [
+  { id: "fair",   label: "Fair",   color: "#FDDBB4" },
+  { id: "light",  label: "Light",  color: "#E8B98A" },
+  { id: "medium", label: "Medium", color: "#C8864E" },
+  { id: "tan",    label: "Tan",    color: "#A0622A" },
+  { id: "deep",   label: "Deep",   color: "#7A3E10" },
+  { id: "rich",   label: "Rich",   color: "#3D1E0A" },
 ];
 
-const colorPalettes: Record<string, {
-  best: { color: string; name: string; why: string }[];
-  avoid: { color: string; name: string }[];
+// ── Color season data (palette + recommended product tags) ────────────────────
+
+const COLOR_SEASONS: Record<string, {
   season: string;
   desc: string;
+  accent: string;
+  neutrals: string[];
+  power: string[];
+  avoid: string[];
+  tip: string;
+  recommendTags: string[];
+  recommendColors: string[];
 }> = {
   fair: {
-    season: "Cool Winter",
-    desc: "Your cool undertones shine with high-contrast, vivid shades.",
-    best: [
-      { color: "#1C3A6B", name: "Navy Blue", why: "Creates stunning contrast" },
-      { color: "#8B0000", name: "Deep Red", why: "Adds rich warmth" },
-      { color: "#1B5E20", name: "Forest Green", why: "Balances your complexion" },
-      { color: "#4A148C", name: "Deep Purple", why: "Enhances cool tones" },
-      { color: "#212121", name: "Jet Black", why: "Bold & striking" },
-      { color: "#880E4F", name: "Berry", why: "Romantic & vibrant" },
-    ],
-    avoid: [
-      { color: "#FFF9C4", name: "Pale Yellow" },
-      { color: "#FFCCBC", name: "Peach" },
-      { color: "#F8BBD0", name: "Baby Pink" },
-    ],
+    season: "Spring / Light",
+    desc: "Warm peachy undertones. Light, clear colors create harmony with your radiance.",
+    accent: "#e8b4c4",
+    neutrals: ["#FAFAF8", "#F5ECD7", "#EAD5C0", "#D4B896"],
+    power:   ["#E8B4C4", "#A8D4C2", "#B8D4F0", "#F5D06E"],
+    avoid:   ["#2a2a2a", "#8B0000", "#4A0080", "#1C4A1C"],
+    tip: "Peach, coral, and warm pastels are your power shades.",
+    recommendTags: ["minimal", "feminine", "elegant"],
+    recommendColors: ["Ivory", "Dusty Rose", "Sage", "White"],
   },
   light: {
-    season: "Light Spring",
-    desc: "Soft, warm, and delicate tones complement your natural glow.",
-    best: [
-      { color: "#81C784", name: "Soft Sage", why: "Gentle & flattering" },
-      { color: "#64B5F6", name: "Sky Blue", why: "Bright & refreshing" },
-      { color: "#F06292", name: "Warm Pink", why: "Adds lovely color" },
-      { color: "#FFB74D", name: "Peach", why: "Enhances warmth" },
-      { color: "#A5D6A7", name: "Mint", why: "Fresh & glowing" },
-      { color: "#CE93D8", name: "Lavender", why: "Soft & romantic" },
-    ],
-    avoid: [
-      { color: "#212121", name: "Jet Black" },
-      { color: "#4E342E", name: "Dark Brown" },
-      { color: "#37474F", name: "Charcoal" },
-    ],
+    season: "Summer / Light",
+    desc: "Cool muted tones suit your complexion. Soft blended colors enhance your elegance.",
+    accent: "#b4c8e8",
+    neutrals: ["#F8F8FA", "#E8E4F0", "#D4C8DC", "#C0B4C8"],
+    power:   ["#B4C8E8", "#C8B4E8", "#E8C8D4", "#B4D4C8"],
+    avoid:   ["#FF6600", "#FFD700", "#8B4513", "#FF4500"],
+    tip: "Cool-toned pastels are your signature. Avoid warm oranges.",
+    recommendTags: ["minimal", "classic", "elegant"],
+    recommendColors: ["White", "Ivory", "Sage", "Indigo"],
   },
   medium: {
-    season: "True Autumn",
-    desc: "Earth tones and warm hues mirror your natural radiance.",
-    best: [
-      { color: "#BF360C", name: "Burnt Orange", why: "Mirrors warmth perfectly" },
-      { color: "#6D4C41", name: "Warm Brown", why: "Natural harmony" },
-      { color: "#F9A825", name: "Mustard", why: "Glowing complement" },
-      { color: "#558B2F", name: "Olive Green", why: "Earthy & rich" },
-      { color: "#4E342E", name: "Chocolate", why: "Deep & sophisticated" },
-      { color: "#E65100", name: "Terracotta", why: "Stunning warmth" },
-    ],
-    avoid: [
-      { color: "#B0BEC5", name: "Light Gray" },
-      { color: "#E1F5FE", name: "Pale Blue" },
-      { color: "#F3E5F5", name: "Pastel Purple" },
-    ],
+    season: "Spring / Warm",
+    desc: "Warm undertones shine with golden and earthy palettes.",
+    accent: "#d4a84b",
+    neutrals: ["#F5ECD7", "#E8D4B8", "#C4A882", "#A08858"],
+    power:   ["#D4A84B", "#E87840", "#C85A2A", "#8FB86A"],
+    avoid:   ["#E8E4F0", "#B4B8E8", "#D4E8F0"],
+    tip: "Gold accessories and warm earth tones are perfect for you.",
+    recommendTags: ["bohemian", "trendy", "casual"],
+    recommendColors: ["Mustard", "Camel", "Olive", "Tan"],
   },
   tan: {
-    season: "Warm Summer",
-    desc: "Jewel tones and saturated shades bring out your luminosity.",
-    best: [
-      { color: "#0D47A1", name: "Royal Blue", why: "Bold contrast" },
-      { color: "#1B5E20", name: "Emerald", why: "Rich & vibrant" },
-      { color: "#B71C1C", name: "Crimson", why: "Powerful energy" },
-      { color: "#4527A0", name: "Violet", why: "Luxurious depth" },
-      { color: "#F57F17", name: "Golden", why: "Warm luminosity" },
-      { color: "#006064", name: "Teal", why: "Striking complement" },
-    ],
-    avoid: [
-      { color: "#FFF8E1", name: "Cream" },
-      { color: "#FCE4EC", name: "Blush Pink" },
-      { color: "#E8F5E9", name: "Mint White" },
-    ],
+    season: "Autumn / Warm",
+    desc: "Rich earthy colors complement your warm undertones beautifully.",
+    accent: "#c47820",
+    neutrals: ["#E8D4B0", "#C4A870", "#A08040", "#806030"],
+    power:   ["#C47820", "#8B4513", "#2D5A1B", "#8B0000"],
+    avoid:   ["#F0F8FF", "#E8F4F0", "#F5F0E8"],
+    tip: "Burnt orange, mustard and forest green make you glow.",
+    recommendTags: ["streetwear", "casual", "bohemian"],
+    recommendColors: ["Mustard", "Olive", "Camel", "Brown"],
   },
   deep: {
-    season: "Deep Autumn",
-    desc: "Rich, bold colors create beautiful contrast with your complexion.",
-    best: [
-      { color: "#FF6F00", name: "Deep Orange", why: "Vibrant & striking" },
-      { color: "#FFCA28", name: "Golden Yellow", why: "Luminous glow" },
-      { color: "#00695C", name: "Deep Teal", why: "Luxurious depth" },
-      { color: "#AD1457", name: "Magenta", why: "Bold & beautiful" },
-      { color: "#558B2F", name: "Rich Olive", why: "Natural harmony" },
-      { color: "#6A1B9A", name: "Deep Plum", why: "Regal elegance" },
-    ],
-    avoid: [
-      { color: "#E0E0E0", name: "Light Gray" },
-      { color: "#FFCCBC", name: "Pale Peach" },
-      { color: "#B3E5FC", name: "Light Blue" },
-    ],
+    season: "Autumn / Deep",
+    desc: "Rich bold colors complement your complexion. Jewel tones are your best ally.",
+    accent: "#8b2252",
+    neutrals: ["#3A2828", "#5A4040", "#7A5858", "#A08070"],
+    power:   ["#8B2252", "#1A5A8A", "#2A7A2A", "#8B6914"],
+    avoid:   ["#F5F5DC", "#FFFAF0", "#F0FFF0"],
+    tip: "Rich jewel tones and metallic accents are perfect.",
+    recommendTags: ["elegant", "classic", "office"],
+    recommendColors: ["Black", "Indigo", "Gold", "Multicolor"],
   },
   rich: {
-    season: "Deep Winter",
-    desc: "Bright jewel tones and stark contrasts amplify your power.",
-    best: [
-      { color: "#FFFFFF", name: "Pure White", why: "Maximum contrast" },
-      { color: "#FF1744", name: "Bright Red", why: "Electric energy" },
-      { color: "#00B0FF", name: "Electric Blue", why: "Vivid & striking" },
-      { color: "#00E676", name: "Emerald Green", why: "Bold vibrancy" },
-      { color: "#AA00FF", name: "Neon Violet", why: "Dramatic impact" },
-      { color: "#FFD600", name: "Vivid Yellow", why: "Radiant warmth" },
-    ],
-    avoid: [
-      { color: "#EFEBE9", name: "Beige" },
-      { color: "#D7CCC8", name: "Taupe" },
-      { color: "#FFF9C4", name: "Pastel Yellow" },
-    ],
+    season: "Winter / Deep",
+    desc: "Bold saturated colors are yours to command. High-contrast is your signature.",
+    accent: "#4a1a7a",
+    neutrals: ["#1A1A1A", "#2A2A2A", "#404040", "#F5F5F5"],
+    power:   ["#4A1A7A", "#1A2A7A", "#7A1A1A", "#1A7A4A"],
+    avoid:   ["#F5DEB3", "#FFDEAD", "#DEB887"],
+    tip: "Black & white, jewel tones, and metallics are brilliant on you.",
+    recommendTags: ["classic", "timeless", "elegant", "minimal"],
+    recommendColors: ["Black", "White", "Gold", "Indigo"],
   },
 };
 
-export default function ColorAnalysis({ onBack }: Props) {
-  const [selectedTone, setSelectedTone] = useState<string | null>(null);
-  const [analyzing, setAnalyzing] = useState(false);
-  const [result, setResult] = useState(false);
+// ── Component ─────────────────────────────────────────────────────────────────
 
-  const handleAnalyze = () => {
-    if (!selectedTone) return;
-    setAnalyzing(true);
-    setResult(false);
-    setTimeout(() => {
-      setAnalyzing(false);
-      setResult(true);
-    }, 2000);
+export default function ColorAnalysis() {
+  const [step, setStep] = useState<"input" | "loading" | "results">("input");
+  const [selectedTone, setSelectedTone] = useState<string | null>(null);
+  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const palette = selectedTone ? COLOR_SEASONS[selectedTone] : null;
+
+  // ── Recommended products from store ───────────────────────────────────────
+  const recommendedProducts: StoreProduct[] = palette
+    ? STORE_PRODUCTS.filter(
+        (p) =>
+          p.inStock &&
+          (palette.recommendColors.includes(p.color) ||
+            palette.recommendTags.some((t) => p.tags.includes(t)))
+      ).slice(0, 8)
+    : [];
+
+  // ── Upload handler ─────────────────────────────────────────────────────────
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setUploadedImage(ev.target?.result as string);
+      setAnalyzing(true);
+      setTimeout(() => {
+        setSelectedTone("medium"); // AI-detected — replace with real skin tone API
+        setAnalyzing(false);
+      }, 1800);
+    };
+    reader.readAsDataURL(file);
   };
 
-  const palette = selectedTone ? colorPalettes[selectedTone] : null;
+  const handleAnalyze = async () => {
+    if (!selectedTone) return;
+    setStep("loading");
+    await new Promise((r) => setTimeout(r, 1800));
+    setStep("results");
+  };
 
+  const Swatch = ({ color, size = 44 }: { color: string; size?: number }) => (
+    <div style={{
+      width: size, height: size, borderRadius: "50%",
+      background: color, border: "2px solid rgba(255,255,255,0.6)",
+      boxShadow: "0 2px 8px rgba(0,0,0,0.12)", flexShrink: 0,
+    }} />
+  );
+
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-[#F7F5F2] font-['DM_Sans',sans-serif]">
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,600;1,500&display=swap');
-        * { box-sizing: border-box; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
-        .fade-in { animation: fadeIn 0.5s ease both; }
-        @keyframes colorPop { 0% { transform: scale(0); opacity: 0; } 60% { transform: scale(1.15); } 100% { transform: scale(1); opacity: 1; } }
-        .color-pop { animation: colorPop 0.4s ease both; }
-        @keyframes rotateScan { 0% { transform: translateX(-100%); } 100% { transform: translateX(200%); } }
-        .scan-line { animation: rotateScan 1.5s ease infinite; }
-        .tone-btn { transition: all 0.2s ease; }
-        .tone-btn:hover { transform: scale(1.08); }
-      `}</style>
+    <div style={{ fontFamily: "'DM Sans', sans-serif", background: "#f8f6f2", minHeight: "100vh" }}>
+      <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@500;700&display=swap" rel="stylesheet" />
 
-      <div className="max-w-[430px] mx-auto min-h-screen bg-white shadow-2xl">
-
-        {/* Header */}
-        <div className="px-5 pt-14 pb-4 flex items-center gap-4">
-          <button onClick={onBack} className="w-9 h-9 rounded-full bg-[#F5F3EF] flex items-center justify-center">
-            <svg width="18" height="18" fill="none" stroke="#1a1a1a" strokeWidth="2" viewBox="0 0 24 24">
-              <path d="M19 12H5M12 19l-7-7 7-7"/>
-            </svg>
+      {/* ── Header ── */}
+      <div style={{
+        background: "#fff", padding: "20px 24px 16px", borderBottom: "1px solid #ece9e3",
+        position: "sticky", top: 0, zIndex: 50,
+      }}>
+        {step !== "input" && (
+          <button onClick={() => setStep("input")}
+            style={{ background: "none", border: "none", cursor: "pointer", fontSize: "22px", display: "block", marginBottom: "4px", color: "#1a1a1a" }}>
+            ←
           </button>
-          <div>
-            <h1 className="text-2xl font-['Playfair_Display'] font-semibold text-[#1a1a1a]">Color Analysis</h1>
-            <p className="text-xs text-[#888]">Discover your best color palette</p>
-          </div>
-        </div>
+        )}
+        <h1 style={{ margin: 0, fontSize: "20px", fontWeight: 700, fontFamily: "'Playfair Display', serif", color: "#1a1a1a" }}>
+          Color Analysis
+        </h1>
+        <p style={{ margin: "2px 0 0", fontSize: "12px", color: "#888" }}>Discover your palette · Shop your colors</p>
+      </div>
 
-        {/* Upload option */}
-        <div className="mx-5 mb-5">
-          <div className="rounded-2xl bg-gradient-to-r from-[#FFF8E8] to-[#FFEFC8] p-4 flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center text-2xl flex-shrink-0">📷</div>
-            <div className="flex-1">
-              <p className="text-sm font-semibold text-[#1a1a1a]">Use your selfie</p>
-              <p className="text-xs text-[#666]">AI detects your skin tone automatically</p>
-            </div>
-            <button className="bg-[#1a1a1a] text-white text-xs font-semibold px-3 py-2 rounded-xl flex-shrink-0">
-              Upload
-            </button>
-          </div>
-        </div>
+      {/* ── Step 1: Input ── */}
+      {step === "input" && (
+        <div style={{ padding: "24px", maxWidth: 560, margin: "0 auto" }}>
 
-        {/* Manual tone selection */}
-        <div className="px-5 mb-5">
-          <p className="text-xs font-semibold text-[#888] uppercase tracking-wider mb-3">Or select your skin tone</p>
-          <div className="grid grid-cols-6 gap-2">
-            {skinTones.map((tone) => (
-              <button
-                key={tone.id}
-                onClick={() => { setSelectedTone(tone.id); setResult(false); }}
-                className="tone-btn flex flex-col items-center gap-1"
-              >
-                <div
-                  className="w-12 h-12 rounded-2xl shadow-sm transition-all"
+          {/* Upload */}
+          <div style={{
+            background: "#fff", borderRadius: "16px", padding: "20px",
+            marginBottom: "24px", boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+              <div style={{
+                width: 56, height: 56, borderRadius: "12px", overflow: "hidden",
+                background: "#f3f0ea", flexShrink: 0,
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                {uploadedImage
+                  ? <img src={uploadedImage} alt="selfie" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  : <span style={{ fontSize: "24px" }}>📷</span>
+                }
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: "15px", fontWeight: 600, color: "#1a1a1a" }}>Use your selfie</div>
+                <div style={{ fontSize: "12px", color: "#888" }}>
+                  {analyzing ? "Detecting your skin tone..." : "AI detects skin tone automatically"}
+                </div>
+                {analyzing && (
+                  <div style={{ marginTop: "6px", height: 3, background: "#f0ede7", borderRadius: 2, overflow: "hidden" }}>
+                    <div style={{ height: "100%", background: "#1a1a1a", borderRadius: 2, animation: "progress 1.8s ease-in-out forwards" }} />
+                  </div>
+                )}
+              </div>
+              {!analyzing && (
+                <button onClick={() => fileRef.current?.click()}
                   style={{
-                    background: tone.hex,
-                    boxShadow: selectedTone === tone.id ? `0 0 0 3px #1a1a1a, 0 0 0 5px ${tone.hex}` : "0 2px 8px rgba(0,0,0,0.1)"
-                  }}
-                />
-                <span className="text-[9px] text-[#666] font-medium">{tone.label}</span>
-              </button>
+                    background: "#1a1a1a", color: "#fff", border: "none",
+                    borderRadius: "10px", padding: "10px 18px", fontSize: "13px",
+                    fontWeight: 600, cursor: "pointer",
+                  }}>
+                  Upload
+                </button>
+              )}
+              <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleImageUpload} />
+            </div>
+          </div>
+
+          {/* Manual tone select */}
+          <p style={{ fontSize: "12px", fontWeight: 600, color: "#888", letterSpacing: "0.05em", marginBottom: "14px" }}>
+            OR SELECT YOUR SKIN TONE
+          </p>
+          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginBottom: "32px" }}>
+            {SKIN_TONES.map((tone) => (
+              <div key={tone.id} onClick={() => setSelectedTone(tone.id)}
+                style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", cursor: "pointer" }}>
+                <div style={{
+                  width: 52, height: 52, borderRadius: "14px", background: tone.color,
+                  border: selectedTone === tone.id ? "3px solid #1a1a1a" : "3px solid transparent",
+                  boxShadow: selectedTone === tone.id ? "0 0 0 2px #fff, 0 0 0 4px #1a1a1a" : "0 2px 8px rgba(0,0,0,0.12)",
+                  transition: "all 0.2s",
+                }} />
+                <span style={{ fontSize: "11px", color: "#666", fontWeight: selectedTone === tone.id ? 600 : 400 }}>
+                  {tone.label}
+                </span>
+              </div>
             ))}
           </div>
-        </div>
 
-        {/* Analyze Button */}
-        <div className="px-5 mb-6">
-          <button
-            onClick={handleAnalyze}
-            disabled={!selectedTone || analyzing}
-            className={`w-full py-4 rounded-2xl font-semibold text-sm transition-all ${
-              selectedTone && !analyzing
-                ? "bg-[#1a1a1a] text-white"
-                : "bg-[#E0DDD8] text-[#aaa] cursor-not-allowed"
-            }`}
-          >
-            {analyzing ? (
-              <span className="flex items-center justify-center gap-2">
-                <svg className="animate-spin" width="16" height="16" fill="none" stroke="white" strokeWidth="2.5" viewBox="0 0 24 24">
-                  <circle cx="12" cy="12" r="10" strokeOpacity="0.2"/><path d="M12 2a10 10 0 0 1 10 10"/>
-                </svg>
-                Analyzing your colors...
-              </span>
-            ) : "🎨 Analyze My Colors"}
+          <button onClick={handleAnalyze} disabled={!selectedTone}
+            style={{
+              width: "100%", padding: "16px",
+              background: selectedTone ? "#1a1a1a" : "#e0ddd8",
+              color: selectedTone ? "#fff" : "#aaa",
+              border: "none", borderRadius: "14px", fontSize: "15px",
+              fontWeight: 600, cursor: selectedTone ? "pointer" : "not-allowed",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
+            }}>
+            ✦ Analyze My Colors
           </button>
-        </div>
 
-        {/* Analyzing Loader */}
-        {analyzing && (
-          <div className="px-5 pb-10">
-            <div className="rounded-3xl bg-[#F5F3EF] p-6 text-center overflow-hidden relative">
-              <div className="absolute inset-0 overflow-hidden rounded-3xl">
-                <div className="scan-line absolute inset-y-0 w-20 bg-gradient-to-r from-transparent via-[#1a1a1a]/10 to-transparent"/>
+          <style>{`@keyframes progress { from { width: 0% } to { width: 100% } }`}</style>
+        </div>
+      )}
+
+      {/* ── Loading ── */}
+      {step === "loading" && (
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "60vh", gap: "20px" }}>
+          <div style={{
+            width: 80, height: 80, borderRadius: "50%",
+            background: `radial-gradient(circle, ${SKIN_TONES.find(t => t.id === selectedTone)?.color || "#e8b98a"}, #f8f6f2)`,
+            animation: "pulse 1.2s ease-in-out infinite",
+          }} />
+          <p style={{ color: "#888", fontSize: "15px", fontWeight: 500 }}>Analyzing your color palette...</p>
+          <style>{`@keyframes pulse { 0%,100%{transform:scale(1);opacity:0.8}50%{transform:scale(1.1);opacity:1} }`}</style>
+        </div>
+      )}
+
+      {/* ── Results ── */}
+      {step === "results" && palette && (
+        <div style={{ padding: "24px", maxWidth: 720, margin: "0 auto" }}>
+
+          {/* Season card */}
+          <div style={{
+            background: "#fff", borderRadius: "20px", padding: "20px",
+            marginBottom: "18px", boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
+            borderLeft: `4px solid ${palette.accent}`,
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "12px" }}>
+              <div style={{
+                width: 48, height: 48, borderRadius: "50%",
+                background: SKIN_TONES.find(t => t.id === selectedTone)?.color,
+                border: "2px solid #fff", boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+              }} />
+              <div>
+                <div style={{ fontSize: "18px", fontWeight: 700, fontFamily: "'Playfair Display', serif", color: "#1a1a1a" }}>
+                  {palette.season}
+                </div>
+                <div style={{ fontSize: "12px", color: "#888" }}>Your color season</div>
               </div>
-              <div className="text-4xl mb-3">🔬</div>
-              <p className="font-semibold text-[#1a1a1a] text-sm">Analyzing your undertones...</p>
-              <p className="text-xs text-[#888] mt-1">Matching seasonal palette</p>
-              <div className="flex justify-center gap-2 mt-4">
-                {["Warm", "Cool", "Neutral"].map((t, i) => (
-                  <div
-                    key={t}
-                    className="px-3 py-1 rounded-full text-xs font-medium bg-white text-[#666]"
-                    style={{ animationDelay: `${i * 0.2}s` }}
-                  >
-                    {t}
-                  </div>
-                ))}
-              </div>
+            </div>
+            <p style={{ fontSize: "13px", color: "#555", lineHeight: 1.6, margin: 0 }}>{palette.desc}</p>
+          </div>
+
+          {/* Neutrals */}
+          <div style={{ background: "#fff", borderRadius: "16px", padding: "18px 20px", marginBottom: "14px", boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}>
+            <div style={{ fontSize: "13px", fontWeight: 700, color: "#1a1a1a", marginBottom: "12px" }}>Your Neutrals</div>
+            <div style={{ display: "flex", gap: "12px" }}>
+              {palette.neutrals.map((c, i) => <Swatch key={i} color={c} />)}
             </div>
           </div>
-        )}
 
-        {/* Results */}
-        {result && palette && selectedTone && (
-          <div className="px-5 pb-24 fade-in">
+          {/* Power colors */}
+          <div style={{ background: "#fff", borderRadius: "16px", padding: "18px 20px", marginBottom: "14px", boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}>
+            <div style={{ fontSize: "13px", fontWeight: 700, color: "#1a1a1a", marginBottom: "12px" }}>Power Colors ✦</div>
+            <div style={{ display: "flex", gap: "12px" }}>
+              {palette.power.map((c, i) => <Swatch key={i} color={c} />)}
+            </div>
+          </div>
 
-            {/* Season Badge */}
-            <div className="rounded-3xl bg-gradient-to-r from-[#FFF8E8] to-[#FFE8C8] p-5 mb-5 flex items-center gap-4">
-              <div className="w-16 h-16 rounded-2xl flex-shrink-0 shadow-lg"
-                style={{ background: skinTones.find(t => t.id === selectedTone)?.hex }}
-              />
-              <div>
-                <p className="text-xs text-[#b07800] font-semibold uppercase tracking-wider">Your Season</p>
-                <h3 className="font-['Playfair_Display'] text-xl font-semibold text-[#1a1a1a]">{palette.season}</h3>
-                <p className="text-xs text-[#666] mt-0.5">{palette.desc}</p>
-              </div>
+          {/* Stylist tip */}
+          <div style={{
+            background: `${palette.accent}18`,
+            borderRadius: "14px", padding: "16px 20px", marginBottom: "20px",
+            border: `1.5px solid ${palette.accent}40`,
+          }}>
+            <div style={{ fontSize: "13px", fontWeight: 700, color: "#1a1a1a", marginBottom: "6px" }}>✦ Stylist Tip</div>
+            <p style={{ margin: 0, fontSize: "13px", color: "#555", lineHeight: 1.6 }}>{palette.tip}</p>
+          </div>
+
+          {/* ── Shop Your Colors — from Azzro store ── */}
+          <div style={{ marginBottom: "24px" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
+              <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 700, color: "#1a1a1a" }}>
+                Shop Your Colors
+              </h3>
+              <span style={{ fontSize: "12px", color: "#888" }}>From Azzro store</span>
             </div>
 
-            {/* Best Colors */}
-            <p className="text-xs font-semibold text-[#888] uppercase tracking-wider mb-3">Your Best Colors ✨</p>
-            <div className="grid grid-cols-3 gap-3 mb-5">
-              {palette.best.map((c, i) => (
-                <div
-                  key={i}
-                  className="color-pop rounded-2xl overflow-hidden"
-                  style={{ animationDelay: `${i * 0.08}s` }}
-                >
-                  <div className="h-16 w-full" style={{ background: c.color }}/>
-                  <div className="p-2 bg-[#F5F3EF]">
-                    <p className="text-[11px] font-semibold text-[#1a1a1a]">{c.name}</p>
-                    <p className="text-[9px] text-[#888] leading-tight">{c.why}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Colors to Avoid */}
-            <p className="text-xs font-semibold text-[#888] uppercase tracking-wider mb-3">Colors to Avoid ⚠️</p>
-            <div className="flex gap-3 mb-5">
-              {palette.avoid.map((c, i) => (
-                <div key={i} className="flex flex-col items-center gap-1.5">
-                  <div className="relative">
-                    <div className="w-14 h-14 rounded-2xl" style={{ background: c.color, border: "1px solid #e0ddd8" }}/>
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="w-8 h-0.5 bg-red-500 rotate-45 rounded-full"/>
-                      <div className="absolute w-8 h-0.5 bg-red-500 -rotate-45 rounded-full"/>
+            <div className="color-products-grid" style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(4, 1fr)",
+              gap: "12px",
+            }}>
+              {recommendedProducts.map((product) => (
+                <Link key={product.id} href={product.slug} style={{ textDecoration: "none" }}>
+                  <div style={{
+                    background: "#fff", borderRadius: "14px", overflow: "hidden",
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.06)", cursor: "pointer",
+                    transition: "transform 0.15s",
+                  }}
+                    onMouseEnter={(e) => (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)"}
+                    onMouseLeave={(e) => (e.currentTarget as HTMLElement).style.transform = "translateY(0)"}
+                  >
+                    {/* Color dot match */}
+                    <div style={{ position: "relative" }}>
+                      <img src={product.image} alt={product.name}
+                        style={{ width: "100%", height: 120, objectFit: "cover" }} />
+                      <div style={{
+                        position: "absolute", top: 6, left: 6,
+                        width: 12, height: 12, borderRadius: "50%",
+                        background: product.colorHex,
+                        border: "2px solid #fff",
+                        boxShadow: "0 1px 4px rgba(0,0,0,0.2)",
+                      }} />
+                    </div>
+                    <div style={{ padding: "8px 10px 10px" }}>
+                      <div style={{ fontSize: "11px", fontWeight: 600, color: "#1a1a1a", lineHeight: 1.3, marginBottom: "2px" }}>
+                        {product.name}
+                      </div>
+                      <div style={{ fontSize: "10px", color: "#aaa", marginBottom: "4px" }}>{product.brand}</div>
+                      <div style={{ fontSize: "11px", color: "#e07070", fontWeight: 700 }}>
+                        ₹{product.price.toLocaleString("en-IN")}
+                      </div>
                     </div>
                   </div>
-                  <span className="text-[9px] text-[#888] text-center font-medium">{c.name}</span>
-                </div>
+                </Link>
               ))}
             </div>
 
-            {/* Style Tips */}
-            <div className="rounded-3xl bg-[#F5F3EF] p-4 mb-4">
-              <p className="text-sm font-semibold text-[#1a1a1a] mb-2">💡 Styling Tips</p>
-              <ul className="space-y-1.5">
-                {[
-                  "Start with your best colors as your base outfit pieces",
-                  "Add accents of secondary colors through accessories",
-                  "Avoid avoid-colors near your face (neckline, scarves)",
-                ].map((tip, i) => (
-                  <li key={i} className="flex items-start gap-2">
-                    <span className="text-[#b07800] mt-0.5">•</span>
-                    <span className="text-xs text-[#555]">{tip}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            {recommendedProducts.length === 0 && (
+              <div style={{ textAlign: "center", padding: "24px", color: "#aaa", fontSize: "13px" }}>
+                No matching products found in store right now.
+              </div>
+            )}
+          </div>
 
-            <button className="w-full py-3.5 rounded-2xl bg-[#1a1a1a] text-white text-sm font-semibold flex items-center justify-center gap-2">
-              <svg width="16" height="16" fill="none" stroke="white" strokeWidth="2" viewBox="0 0 24 24">
-                <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
-                <polyline points="16 6 12 2 8 6"/>
-                <line x1="12" y1="2" x2="12" y2="15"/>
-              </svg>
-              Save My Color Palette
+          {/* Actions */}
+          <div style={{ display: "flex", gap: "12px" }}>
+            <button onClick={() => setStep("input")}
+              style={{
+                flex: 1, padding: "14px", background: "#fff",
+                border: "1.5px solid #ece9e3", borderRadius: "14px",
+                fontSize: "14px", fontWeight: 600, cursor: "pointer", color: "#1a1a1a",
+              }}>
+              Try Again
+            </button>
+            <button
+              style={{
+                flex: 1, padding: "14px", background: "#1a1a1a",
+                border: "none", borderRadius: "14px",
+                fontSize: "14px", fontWeight: 600, cursor: "pointer", color: "#fff",
+              }}>
+              Shop All My Colors
             </button>
           </div>
-        )}
 
-      </div>
+          {/* Responsive */}
+          <style>{`
+            @media (max-width: 600px) {
+              .color-products-grid {
+                grid-template-columns: repeat(2, 1fr) !important;
+              }
+            }
+          `}</style>
+        </div>
+      )}
     </div>
   );
 }
